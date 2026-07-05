@@ -1,96 +1,133 @@
 # CT Speak-It 🎙️
 
-**Drop-in voice dictation for every build you ship.** Hold a hotkey, speak, release — clean, AI-polished text lands exactly where your cursor is. It works like Wispr Flow, but as a tool you embed in your own web apps: one script tag and *every* input, textarea, and rich-text editor on the page gets dictation.
+**Voice for every build you ship.** One script tag gives any web app two superpowers:
 
-## How it works
+1. **Dictation** — hold a hotkey, speak, release: clean, AI-polished text lands exactly where your cursor is.
+2. **Voice actions** — register your app's actions and spoken commands become structured objects: say *"open house at 123 Main Street this Saturday at 2pm"* and `{name: "create_open_house", input: {address: "123 Main Street", date: "2026-07-11", time: "14:00"}}` is delivered to your handler — the card pops onto the dashboard.
 
 ```
- hold Ctrl+Space ──▶ 🎤 listen ──▶ transcribe ──▶ ✨ AI cleanup ──▶ insert at cursor
-                     (Web Speech API           (Claude removes filler words,
-                      or your own               fixes punctuation, applies
-                      Whisper endpoint)         "period" / "new line" commands)
+ hold Ctrl+Space ─▶ 🎤 speak ─▶ Whisper-grade transcription ─▶ Claude decides:
+                                                               ├─ command?  → structured action → your handler
+                                                               └─ dictation → polished text → your cursor
 ```
 
-- **Push-to-talk:** hold `Ctrl+Space` (configurable), speak, release. Or click the floating mic to toggle. `Esc` cancels.
-- **Inserts at the cursor** in whatever field was focused — inputs, textareas, and `contenteditable` rich editors. Dispatches native input events, so React / Vue / Svelte state stays in sync.
-- **AI "Flow formatting" (optional):** point it at the included Claude-powered endpoint and raw speech like *"um send the invoice tuesday no wait wednesday period"* becomes *"Send the invoice Wednesday."*
-- **Zero dependencies, no build step.** One file, ~9 KB. Ships in a Shadow DOM so it can't clash with your app's CSS.
-- **Graceful degradation:** if the formatter is down you get the raw transcript; if no field is focused the text is copied to your clipboard.
+## Quick start
 
-## Quick start (any app, one line)
+**Dictation only (zero backend):**
 
 ```html
-<script src="https://your-cdn-or-app.com/speakit.js"></script>
+<script src="https://your-deployment/src/speakit.js"></script>
 ```
 
-That's it — the mic button appears bottom-right and `Ctrl+Space` works everywhere on the page.
-
-### With AI cleanup
-
-Deploy this repo to Vercel once (it includes `api/format.js`), set `ANTHROPIC_API_KEY` in the project's environment variables, then in every build:
+**Full stack (one deployment serves ALL your products):** deploy this repo to Vercel, set the env vars below, then in every build:
 
 ```html
 <script src="https://ct-speak-it.vercel.app/src/speakit.js"
-        data-format-endpoint="https://ct-speak-it.vercel.app/api/format"></script>
+        data-transcribe-endpoint="https://ct-speak-it.vercel.app/api/transcribe"
+        data-format-endpoint="https://ct-speak-it.vercel.app/api/format"
+        data-actions-endpoint="https://ct-speak-it.vercel.app/api/actions"></script>
 ```
 
-One deployment serves all of your apps (CORS is open by default; restrict it with the `ALLOWED_ORIGINS` env var).
+| Env var | Enables | Required |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | AI cleanup + voice actions (Claude) | for `/api/format` and `/api/actions` |
+| `GROQ_API_KEY` *(or `DEEPGRAM_API_KEY` / `OPENAI_API_KEY`)* | Whisper-grade transcription | for `/api/transcribe` |
+| `ALLOWED_ORIGINS` | CORS allowlist, e.g. `https://crm.you.com,https://apu.you.com` | optional (default `*`) |
+
+## Voice actions — the CRM/dashboard feature
+
+In your app's JS, describe the things a user can create and hand over a handler:
+
+```js
+SpeakIt.registerActions([
+  {
+    name: 'create_open_house',
+    description: 'Schedule an open house for a property',
+    input_schema: {
+      type: 'object',
+      properties: {
+        address: { type: 'string' },
+        date:    { type: 'string', description: 'ISO date' },
+        time:    { type: 'string', description: 'HH:MM 24h' },
+        host:    { type: 'string' },
+        notes:   { type: 'string' }
+      },
+      required: ['address']
+    }
+  }
+], (name, input) => {
+  // name === 'create_open_house', input is schema-shaped and date-resolved
+  api.createOpenHouse(input);      // your backend
+  dashboard.popCard(input);        // your UI
+});
+```
+
+Claude receives your schemas as tools, resolves relative dates ("this Saturday" → real ISO date), applies self-corrections ("2pm no wait 3" → `15:00`), and puts stray remarks into `notes`. Anything that *isn't* a command falls through to normal polished dictation — users never have to think about modes.
+
+## Dictation quality
+
+- **Whisper-grade accuracy:** set `transcribeEndpoint` and audio is transcribed by `whisper-large-v3-turbo` (Groq), `nova-3` (Deepgram), or `whisper-1` (OpenAI) — whichever key you configure. Without it, the browser's built-in recognizer is used (Chrome/Edge/Safari).
+- **Feels instant:** with `liveInsert` (default on), your raw words appear the moment you release the key, then get seamlessly swapped for the Claude-polished version. If you kept typing meanwhile, the swap is skipped — your edits win.
+- **Personal dictionary:** `SpeakIt.learn('Poinciana')` teaches it your agents' names, neighborhoods, and jargon (persisted in localStorage, merged with the `dictionary` option, and fed to the AI to fix mishearings).
+- **Never loses words:** formatter down → raw transcript inserted; no field focused → text goes to the clipboard.
 
 ## Configuration
 
-Via data attributes on the script tag, or `SpeakIt.init({...})`:
+Data attributes on the script tag, or `SpeakIt.init({...})`:
 
 | Option | Attribute | Default | Description |
 |---|---|---|---|
-| `hotkey` | `data-hotkey` | `Ctrl+Space` | Hold-to-talk combo, e.g. `Alt+D`, `Ctrl+Shift+M` |
-| `formatEndpoint` | `data-format-endpoint` | — | URL of the AI cleanup endpoint (`api/format.js`) |
-| `transcribeEndpoint` | `data-transcribe-endpoint` | — | Server transcription (Whisper/Deepgram proxy); enables Firefox support |
-| `engine` | `data-engine` | `auto` | `browser` (Web Speech API), `server`, or `auto` |
+| `hotkey` | `data-hotkey` | `Ctrl+Space` | Hold-to-talk combo (`Alt+D`, `Ctrl+Shift+M`, …) |
+| `transcribeEndpoint` | `data-transcribe-endpoint` | — | Whisper-grade transcription (`api/transcribe.js`) |
+| `formatEndpoint` | `data-format-endpoint` | — | AI cleanup (`api/format.js`) |
+| `actionsEndpoint` | `data-actions-endpoint` | — | Voice actions (`api/actions.js`) |
+| `engine` | `data-engine` | `auto` | `auto` prefers the server engine when configured |
 | `lang` | `data-lang` | `en-US` | Recognition language |
-| `tone` | `data-tone` | `clean` | Cleanup style: `clean`, `formal`, `casual`, `code-comment` |
+| `tone` | `data-tone` | `clean` | `clean` \| `formal` \| `casual` \| `code-comment` |
+| `appContext` | `data-app-context` | page title | Tells the AI what app it's typing into |
+| `dictionary` | — | `[]` | Custom vocabulary (merged with learned words) |
+| `liveInsert` | `data-live-insert="false"` | `true` | Instant raw insert, swap in polish when ready |
 | `position` | `data-position` | `bottom-right` | Mic button corner |
-| `button` | `data-button="false"` | `true` | Hide the floating button (hotkey-only mode) |
+| `button` | `data-button="false"` | `true` | Hide the floating button (hotkey-only) |
 | — | `data-manual="true"` | — | Skip auto-init; call `SpeakIt.init()` yourself |
 
 ### JavaScript API
 
 ```js
-SpeakIt.init({
-  hotkey: 'Ctrl+Space',
-  formatEndpoint: '/api/format',
-  tone: 'formal',
-  appContext: 'customer support reply',   // extra context for the AI cleanup
-  onTranscript: (text) => console.log('inserted:', text),
-  onStateChange: (state) => {},           // idle | listening | polishing | error
-  onError: (err) => {}
-});
-
-SpeakIt.start();    // toggle dictation programmatically
-SpeakIt.stop();
-SpeakIt.cancel();
-SpeakIt.state;      // current state
+SpeakIt.init(options)                       // (re)initialize
+SpeakIt.registerActions(actions, handler)   // voice commands for this app
+SpeakIt.learn('Poinciana')                  // teach a word (persisted)
+SpeakIt.forget('Poinciana')
+SpeakIt.dictionary                          // merged vocabulary
+SpeakIt.simulate('open house at 123 ...')   // run text through the full pipeline (testing/demo)
+SpeakIt.start() / stop() / cancel() / destroy()
+SpeakIt.state                               // idle | listening | polishing | done | error
 ```
 
-Also usable as a module: `const SpeakIt = require('ct-speak-it')` / bundle `src/speakit.js`.
+Callbacks: `onAction(name, input)`, `onTranscript(text)`, `onStateChange(state)`, `onError(err)`.
 
-## Try the demo
+## Demos
 
 ```bash
 npx serve .
-# open http://localhost:3000/demo/
+# http://localhost:3000/demo/        — dictation into inputs/textareas/rich text
+# http://localhost:3000/demo/crm.html — CRM voice actions: speak, cards pop out
 ```
 
-Speech recognition requires **HTTPS or localhost** and works out of the box in Chrome, Edge, and Safari. For Firefox (no Web Speech API), set `transcribeEndpoint` to a Whisper-style server.
+The CRM demo includes an offline mock parser so cards pop even before the API is deployed; deploy `/api/actions` for the real Claude-powered extraction. Mic access requires HTTPS or localhost. For end-to-end local testing with the APIs, use `vercel dev`.
 
 ## Repo layout
 
 ```
-src/speakit.js    the widget — copy or CDN this into any build
-api/format.js     Claude-powered transcript cleanup (Vercel serverless function)
-demo/index.html   playground
+src/speakit.js      the widget — embed in any build
+api/transcribe.js   Whisper-grade transcription proxy (Groq/Deepgram/OpenAI)
+api/actions.js      voice → structured actions (Claude)
+api/format.js       transcript cleanup (Claude)
+demo/index.html     dictation playground
+demo/crm.html       CRM voice-actions demo
 ```
 
-## Notes & limits
+## Notes
 
-- The browser engine uses the platform's speech recognition (Google's on Chrome), which streams audio to that vendor — same as any dictation feature. Use `engine: 'server'` with your own endpoint if you need full control of the audio path.
-- Browsers only expose the microphone to the page itself, so the widget covers everything **inside your apps**. System-wide dictation across native apps (the full desktop Wispr Flow experience) would need a desktop wrapper — the natural next step if you want it.
+- Everything degrades gracefully: actions endpoint down → polished dictation; formatter down → raw transcript; no mic permission → clear error state.
+- This covers everything inside your web apps. System-wide dictation into native apps (desktop Wispr Flow's turf) would be a small desktop wrapper (Tauri/Electron global hotkey) reusing these same endpoints — ask if you want it.

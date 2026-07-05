@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT Speak-It — CRM Voice Actions Demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; background: #0d1117; color: #e6edf3; padding-bottom: 120px;
+  }
+  header {
+    padding: 20px 28px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header h1 .accent { color: #ff8a80; }
+  header .sub { color: #8b949e; font-size: 13px; }
+  kbd { background:#21262d; border:1px solid #30363d; border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:12px; }
+  .try {
+    margin: 20px 28px 0; padding: 14px 18px; border: 1px dashed #30363d; border-radius: 12px;
+    color: #8b949e; font-size: 14px;
+  }
+  .try b { color: #e6edf3; }
+  .simbar { display: flex; gap: 8px; margin-top: 10px; }
+  .simbar input {
+    flex: 1; background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
+    border-radius: 8px; padding: 9px 12px; font: inherit; outline: none;
+  }
+  .simbar button {
+    background: #ff8a80; color: #1a0e0d; border: none; border-radius: 8px;
+    padding: 9px 16px; font: 600 14px system-ui; cursor: pointer;
+  }
+  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; padding: 24px 28px; }
+  .col h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: #8b949e; margin: 0 0 12px; }
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .card.pop { animation: pop .45s cubic-bezier(.2,1.6,.4,1); border-color: #ff8a80; }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card .field { font-size: 13px; color: #8b949e; margin: 2px 0; }
+  .card .field b { color: #c9d1d9; font-weight: 600; }
+  .empty { color: #444c56; font-size: 13px; font-style: italic; }
+  .notes textarea {
+    width: 100%; min-height: 90px; background: #0d1117; color: #e6edf3;
+    border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; font: inherit; resize: vertical;
+  }
+  .notes textarea:focus { border-color: #ff8a80; outline: none; }
+</style>
+</head>
+<body>
+  <header>
+    <h1><span class="accent">●</span> APU Dashboard <span style="color:#8b949e;font-weight:400">· voice demo</span></h1>
+    <span class="sub">Hold <kbd>Ctrl</kbd>+<kbd>Space</kbd> and say: <i>“Open house at 123 Main Street this Saturday at 2pm, hosted by Sarah”</i></span>
+  </header>
+
+  <div class="try">
+    <b>No mic handy?</b> Type what you would have said and hit Speak — it runs the exact same pipeline.
+    <div class="simbar">
+      <input id="sim" type="text" value="Open house at 123 Main Street this Saturday at 2 p.m. hosted by Sarah, bring the new flyers">
+      <button id="simGo" type="button">Speak ➤</button>
+    </div>
+  </div>
+
+  <div class="board">
+    <div class="col">
+      <h2>🏠 Open Houses</h2>
+      <div id="openhouses"><div class="empty">Say “open house at …” to add one</div></div>
+    </div>
+    <div class="col">
+      <h2>✅ Tasks</h2>
+      <div id="tasks"><div class="empty">Say “remind me to …” / “add a task …”</div></div>
+    </div>
+    <div class="col">
+      <h2>📝 Notes</h2>
+      <div id="notes"><div class="empty">Say “note on the Hendersons: …”</div></div>
+      <div class="notes" style="margin-top:14px">
+        <textarea placeholder="Or just dictate free text here — anything that isn't a command lands at your cursor…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script src="../src/speakit.js" data-manual="true"></script>
+  <script>
+    // ---- 1. Define the actions this dashboard understands -------------------
+    var ACTIONS = [
+      {
+        name: 'create_open_house',
+        description: 'Schedule an open house showing for a property. Trigger when the speaker mentions an open house, a showing, or hosting buyers at a property.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            address: { type: 'string', description: 'Street address of the property' },
+            date: { type: 'string', description: 'ISO date YYYY-MM-DD' },
+            time: { type: 'string', description: 'Start time HH:MM 24h' },
+            host: { type: 'string', description: 'Agent hosting, if mentioned' },
+            notes: { type: 'string', description: 'Anything else the speaker said' }
+          },
+          required: ['address']
+        }
+      },
+      {
+        name: 'create_task',
+        description: 'Add a to-do/task/reminder. Trigger on "remind me to", "add a task", "I need to", "follow up".',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            due: { type: 'string', description: 'ISO date if a deadline was mentioned' },
+            priority: { type: 'string', enum: ['low', 'normal', 'high'] }
+          },
+          required: ['title']
+        }
+      },
+      {
+        name: 'log_note',
+        description: 'Log a note about a contact, lead, or deal. Trigger on "note on/about X", "log that", "make a note".',
+        input_schema: {
+          type: 'object',
+          properties: {
+            about: { type: 'string', description: 'Who or what the note is about' },
+            note: { type: 'string' }
+          },
+          required: ['note']
+        }
+      }
+    ];
+
+    // ---- 2. Render matched actions as cards ---------------------------------
+    function card(col, title, fields) {
+      var wrap = document.querySelector(col);
+      var empty = wrap.querySelector('.empty');
+      if (empty) empty.remove();
+      var el = document.createElement('div');
+      el.className = 'card pop';
+      var html = '<h3>' + title + '</h3>';
+      Object.keys(fields).forEach(function (k) {
+        if (fields[k]) html += '<div class="field"><b>' + k + ':</b> ' + fields[k] + '</div>';
+      });
+      el.innerHTML = html;
+      wrap.prepend(el);
+    }
+
+    function handleAction(name, input) {
+      if (name === 'create_open_house') {
+        card('#openhouses', '🏠 ' + (input.address || 'Open house'), {
+          date: input.date, time: input.time, host: input.host, notes: input.notes
+        });
+      } else if (name === 'create_task') {
+        card('#tasks', '✅ ' + (input.title || 'Task'), { due: input.due, priority: input.priority });
+      } else if (name === 'log_note') {
+        card('#notes', '📝 ' + (input.about || 'Note'), { note: input.note });
+      }
+      // In your real CRM this is where you'd POST to your own backend.
+    }
+
+    // ---- 3. Wire up SpeakIt --------------------------------------------------
+    SpeakIt.init({
+      actions: ACTIONS,
+      actionsEndpoint: '/api/actions',
+      formatEndpoint: '/api/format',
+      // transcribeEndpoint: '/api/transcribe',   // enable after deploy for Whisper-grade accuracy
+      appContext: 'Real-estate CRM / APU dashboard. Users schedule open houses, add tasks, and log notes about contacts.',
+      dictionary: ['APU', 'Thunderbird'],
+      onAction: handleAction
+    });
+
+    document.getElementById('simGo').addEventListener('click', function () {
+      SpeakIt.simulate(document.getElementById('sim').value);
+    });
+
+    // ---- Offline fallback (demo only) ---------------------------------------
+    // When /api/actions isn't deployed (e.g. opening this file directly), a tiny
+    // regex parser stands in so the demo still pops cards. Your real apps should
+    // always use the Claude endpoint — it is far smarter than this.
+    (function () {
+      var realFetch = window.fetch.bind(window);
+      window.fetch = function (url, opts) {
+        var isActions = typeof url === 'string' && url.indexOf('/api/actions') !== -1;
+        if (!isActions) return realFetch(url, opts);
+        return realFetch(url, opts).then(function (r) {
+          if (!r.ok && r.status !== 400) throw new Error('unavailable');
+          return r;
+        }).catch(function () {
+          var text = JSON.parse(opts.body).text;
+          return new Response(JSON.stringify(mockResolve(text)), {
+            status: 200, headers: { 'Content-Type': 'application/json' }
+          });
+        });
+      };
+
+      function mockResolve(text) {
+        var t = ' ' + text.toLowerCase() + ' ';
+        if (t.indexOf('open house') !== -1) {
+          var addr = /(?:at|on)\s+(\d+[^,.]*?(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|way|court|ct|place|pl))\b/i.exec(text);
+          var time = /(\d{1,2})(?::(\d{2}))?\s*(?:o'clock\s*)?(a\.?m\.?|p\.?m\.?)/i.exec(text);
+          var day = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/i.exec(text);
+          var host = /hosted by\s+([a-z]+)/i.exec(text);
+          var hh = time ? (parseInt(time[1], 10) % 12) + (/p/i.test(time[3]) ? 12 : 0) : null;
+          return { kind: 'action', name: 'create_open_house', input: {
+            address: addr ? addr[1].replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : 'Address (offline mock)',
+            date: day ? day[1].charAt(0).toUpperCase() + day[1].slice(1) : '',
+            time: hh != null ? (hh < 10 ? '0' : '') + hh + ':' + (time[2] || '00') : '',
+            host: host ? host[1].charAt(0).toUpperCase() + host[1].slice(1) : '',
+            notes: '(offline mock — deploy /api/actions for full extraction)'
+          } };
+        }
+        if (/remind me|add a task|to-do|todo|follow up/i.test(text)) {
+          return { kind: 'action', name: 'create_task', input: { title: text.replace(/^.*?(remind me to|add a task( to)?|follow up (on|with))\s*/i, '') } };
+        }
+        if (/\b(note|log)\b/i.test(text)) {
+          var about = /(?:note|log)\s+(?:on|about|that)?\s*(?:the\s+)?([a-z]+s?)[:,]/i.exec(text);
+          return { kind: 'action', name: 'log_note', input: { about: about ? about[1] : '', note: text } };
+        }
+        return { kind: 'dictation', text: text };
+      }
+    })();
+  </script>
+</body>
+</html>

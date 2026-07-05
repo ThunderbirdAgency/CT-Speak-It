@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { text, tone = 'clean', appContext = '' } = req.body || {};
+  const { text, tone = 'clean', appContext = '', dictionary = [] } = req.body || {};
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'Missing "text"' });
   }
@@ -69,6 +69,9 @@ export default async function handler(req, res) {
           content:
             `Style: ${TONES[tone] || TONES.clean}\n` +
             (appContext ? `The text is being dictated into: ${appContext}\n` : '') +
+            (Array.isArray(dictionary) && dictionary.length
+              ? `Names/terms the speaker uses (fix mishearings toward these): ${dictionary.slice(0, 200).join(', ')}\n`
+              : '') +
             `\nRaw transcript:\n${text}`
         }
       ]

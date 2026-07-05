@@ -1,7 +1,7 @@
 {
   "name": "ct-speak-it",
-  "version": "1.0.0",
-  "description": "Drop-in voice dictation for any web app — hold a hotkey, speak, and AI-polished text lands at your cursor. Wispr Flow-style dictation you can embed in every build.",
+  "version": "2.0.0",
+  "description": "Drop-in voice dictation + voice actions for any web app — hold a hotkey, speak, and AI-polished text lands at your cursor, or spoken commands become structured objects your dashboard renders.",
   "main": "src/speakit.js",
   "files": [
     "src",
