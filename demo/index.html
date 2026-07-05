@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT Speak-It — Demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    max-width: 760px; margin: 0 auto; padding: 48px 24px 120px;
+    background: #0d1117; color: #e6edf3;
+  }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  h1 .accent { color: #ff8a80; }
+  p.sub { color: #8b949e; margin-top: 0; }
+  kbd {
+    background: #21262d; border: 1px solid #30363d; border-bottom-width: 2px;
+    border-radius: 6px; padding: 2px 7px; font-size: 13px;
+  }
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    padding: 20px; margin: 20px 0;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+  input[type="text"], input[type="email"], textarea, [contenteditable] {
+    width: 100%; background: #0d1117; color: #e6edf3;
+    border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px;
+    font: inherit; outline: none;
+  }
+  input:focus, textarea:focus, [contenteditable]:focus { border-color: #ff8a80; }
+  textarea { min-height: 110px; resize: vertical; }
+  [contenteditable] { min-height: 90px; }
+  .hint { font-size: 13px; color: #8b949e; margin-top: 6px; }
+  .steps li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+  <h1><span class="accent">●</span> CT Speak-It</h1>
+  <p class="sub">Voice dictation for every build. Click into any field below, then hold
+  <kbd>Ctrl</kbd>+<kbd>Space</kbd> and speak — or tap the mic in the corner. Press <kbd>Esc</kbd> to cancel.</p>
+
+  <div class="card">
+    <label for="subject">Plain input</label>
+    <input id="subject" type="text" placeholder="Email subject…">
+  </div>
+
+  <div class="card">
+    <label for="message">Textarea</label>
+    <textarea id="message" placeholder="Dictate a longer message here…"></textarea>
+    <div class="hint">Text is inserted at your cursor position, so you can dictate mid-sentence.</div>
+  </div>
+
+  <div class="card">
+    <label>Rich text (contenteditable)</label>
+    <div contenteditable="true" data-placeholder="Works in rich editors too…"></div>
+    <div class="hint">Same API used by editors like Quill, Slate, and ProseMirror.</div>
+  </div>
+
+  <div class="card">
+    <label>How to add it to any of your builds</label>
+    <ol class="steps">
+      <li>Copy <code>src/speakit.js</code> into the project (or serve it from one shared URL).</li>
+      <li>Add <code>&lt;script src="speakit.js"&gt;&lt;/script&gt;</code> before <code>&lt;/body&gt;</code>.</li>
+      <li>Optional: deploy <code>api/format.js</code> once and add
+        <code>data-format-endpoint="https://…/api/format"</code> for AI cleanup.</li>
+    </ol>
+  </div>
+
+  <!-- The whole integration is this one line.
+       Add data-format-endpoint="/api/format" once the formatter is deployed. -->
+  <script src="../src/speakit.js"></script>
+</body>
+</html>

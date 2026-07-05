@@ -1,0 +1,25 @@
+{
+  "name": "ct-speak-it",
+  "version": "1.0.0",
+  "description": "Drop-in voice dictation for any web app — hold a hotkey, speak, and AI-polished text lands at your cursor. Wispr Flow-style dictation you can embed in every build.",
+  "main": "src/speakit.js",
+  "files": [
+    "src",
+    "api"
+  ],
+  "scripts": {
+    "demo": "npx serve ."
+  },
+  "keywords": [
+    "dictation",
+    "voice",
+    "speech-to-text",
+    "speech-recognition",
+    "widget",
+    "claude"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
