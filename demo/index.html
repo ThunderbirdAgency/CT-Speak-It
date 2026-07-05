@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CT Speak-It — Demo</title>
+<title>Mockingbird — Dictation Demo</title>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -37,7 +37,7 @@
 </style>
 </head>
 <body>
-  <h1><span class="accent">●</span> CT Speak-It</h1>
+  <h1><span class="accent">🐦</span> Mockingbird</h1>
   <p class="sub">Voice dictation for every build. Click into any field below, then hold
   <kbd>Ctrl</kbd>+<kbd>Space</kbd> and speak — or tap the mic in the corner. Press <kbd>Esc</kbd> to cancel.</p>
 
@@ -61,8 +61,8 @@
   <div class="card">
     <label>How to add it to any of your builds</label>
     <ol class="steps">
-      <li>Copy <code>src/speakit.js</code> into the project (or serve it from one shared URL).</li>
-      <li>Add <code>&lt;script src="speakit.js"&gt;&lt;/script&gt;</code> before <code>&lt;/body&gt;</code>.</li>
+      <li>Copy <code>src/mockingbird.js</code> into the project (or serve it from one shared URL).</li>
+      <li>Add <code>&lt;script src="mockingbird.js"&gt;&lt;/script&gt;</code> before <code>&lt;/body&gt;</code>.</li>
       <li>Optional: deploy <code>api/format.js</code> once and add
         <code>data-format-endpoint="https://…/api/format"</code> for AI cleanup.</li>
     </ol>
@@ -70,6 +70,6 @@
 
   <!-- The whole integration is this one line.
        Add data-format-endpoint="/api/format" once the formatter is deployed. -->
-  <script src="../src/speakit.js"></script>
+  <script src="../src/mockingbird.js"></script>
 </body>
 </html>

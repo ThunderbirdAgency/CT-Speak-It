@@ -1,37 +1,40 @@
 /*!
- * CT Speak-It v2 — drop-in voice dictation + voice actions for any web app.
+ * Mockingbird 🐦 — voice for every Thunderbird build.
  *
  * Dictation: hold a hotkey (or tap the floating mic), speak, release — clean,
- * AI-polished text is inserted wherever your cursor is.
+ * Claude-polished text is inserted wherever your cursor is.
  *
- * Voice actions: register your app's actions (create_open_house, add_task, ...)
- * and spoken commands become structured objects delivered to your handler.
+ * Voice actions: register your app's actions (create_contact, create_open_house,
+ * add_task, ...) and spoken input becomes structured objects delivered to your
+ * handler — one utterance can produce several ("three people came through:
+ * John..., Maria..., Sam..." → three create_contact actions).
  *
  * Usage (zero config):
- *   <script src="speakit.js"></script>
+ *   <script src="mockingbird.js"></script>
  *
  * Usage (configured):
- *   <script src="speakit.js"
+ *   <script src="mockingbird.js"
  *           data-format-endpoint="/api/format"
  *           data-transcribe-endpoint="/api/transcribe"
  *           data-actions-endpoint="/api/actions"></script>
  *
  * Voice actions (in your app code):
- *   SpeakIt.registerActions([
- *     { name: 'create_open_house',
- *       description: 'Schedule an open house for a property',
+ *   Mockingbird.registerActions([
+ *     { name: 'create_contact',
+ *       description: 'Save a new contact/lead',
  *       input_schema: { type: 'object', properties: {
- *         address: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }
- *       }, required: ['address'] } }
- *   ], (name, input) => addCardToDashboard(name, input));
+ *         name: { type: 'string' }, phone: { type: 'string' }, email: { type: 'string' }
+ *       }, required: ['name'] } }
+ *   ], (name, input) => crm.handle(name, input));
  */
 (function (global, factory) {
   if (typeof module === 'object' && typeof module.exports === 'object') {
     module.exports = factory();
   } else {
-    global.SpeakIt = factory();
+    global.Mockingbird = factory();
+    global.SpeakIt = global.Mockingbird; // back-compat alias
     if (typeof document !== 'undefined') {
-      var boot = function () { global.SpeakIt._autoInit(); };
+      var boot = function () { global.Mockingbird._autoInit(); };
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);
       } else {
@@ -42,8 +45,9 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
 
-  var VERSION = '2.0.0';
-  var DICT_STORAGE_KEY = 'speakit.dictionary';
+  var VERSION = '3.0.0';
+  var DICT_STORAGE_KEY = 'mockingbird.dictionary';
+  var LEGACY_DICT_KEY = 'speakit.dictionary';
 
   var DEFAULTS = {
     // Hold-to-talk hotkey. String form: "Ctrl+Space", "Alt+D", "Ctrl+Shift+M"...
@@ -53,26 +57,28 @@
     // else browser.
     engine: 'auto',
     lang: 'en-US',
-    // AI cleanup endpoint: POST {text, tone, appContext, dictionary} -> {text}.
+    // Claude cleanup endpoint: POST {text, tone, appContext, dictionary, user} -> {text}.
     formatEndpoint: null,
     // Server transcription endpoint: POST audio/webm body -> {text}.
     transcribeEndpoint: null,
-    // Voice-actions endpoint: POST {text, actions, appContext, dictionary}
-    //   -> {kind:'action', name, input} | {kind:'dictation', text}.
+    // Voice-actions endpoint: POST {text, actions, appContext, dictionary, user}
+    //   -> {kind:'actions', actions:[{name, input}, ...]} | {kind:'dictation', text}.
     actionsEndpoint: null,
     // Registered actions: [{name, description, input_schema}]. Usually set via
-    // SpeakIt.registerActions(actions, handler).
+    // Mockingbird.registerActions(actions, handler).
     actions: [],
-    onAction: null,        // (name, input) => void — a spoken command matched
+    onAction: null,        // (name, input) => void — called once per matched action
     // Writing style for the formatter: 'clean' | 'formal' | 'casual' | 'code-comment'
     tone: 'clean',
-    // Extra context sent to the AI (e.g. "real-estate CRM, open-house scheduling").
+    // Extra context sent to Claude (e.g. "real-estate CRM, open-house scheduling").
     appContext: '',
+    // Who is speaking — flows through to the event log (Supabase) for analytics.
+    userId: null,
     // Personal dictionary: names, neighborhoods, jargon the recognizer gets wrong.
-    // Merged with words learned via SpeakIt.learn(), persisted in localStorage.
+    // Merged with words learned via Mockingbird.learn(), persisted in localStorage.
     dictionary: [],
     // Insert the raw transcript instantly, then swap in the polished version
-    // when the AI responds (inputs/textareas only — feels instant, like Wispr).
+    // when Claude responds (inputs/textareas only — feels instant).
     liveInsert: true,
     button: true,
     position: 'bottom-right', // bottom-right | bottom-left | top-right | top-left
@@ -143,7 +149,7 @@
 
   function loadStoredDictionary() {
     try {
-      var raw = localStorage.getItem(DICT_STORAGE_KEY);
+      var raw = localStorage.getItem(DICT_STORAGE_KEY) || localStorage.getItem(LEGACY_DICT_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch (e) { return []; }
   }
@@ -156,7 +162,7 @@
   // The widget
   // ---------------------------------------------------------------------------
 
-  function SpeakItInstance(options) {
+  function MockingbirdInstance(options) {
     this.opts = Object.assign({}, DEFAULTS, options || {});
     this.hotkeySpec = parseHotkey(this.opts.hotkey);
     this.state = 'idle';
@@ -173,7 +179,7 @@
     this._bindEvents();
   }
 
-  SpeakItInstance.prototype = {
+  MockingbirdInstance.prototype = {
 
     // ------------------------------------------------------------- lifecycle
 
@@ -248,7 +254,7 @@
     _buildUI: function () {
       if (typeof document === 'undefined') return;
       var host = document.createElement('div');
-      host.setAttribute('data-speakit', '');
+      host.setAttribute('data-mockingbird', '');
       var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
       var pos = {
         'bottom-right': 'bottom:24px;right:24px;',
@@ -260,32 +266,32 @@
       var style = document.createElement('style');
       style.textContent =
         ':host{all:initial}' +
-        '.si-wrap{position:fixed;' + pos + 'z-index:' + this.opts.zIndex + ';display:flex;align-items:center;gap:10px;' +
+        '.mb-wrap{position:fixed;' + pos + 'z-index:' + this.opts.zIndex + ';display:flex;align-items:center;gap:10px;' +
         'font:500 13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;flex-direction:row-reverse;}' +
-        '.si-btn{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+        '.mb-btn{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
         'background:#101418;color:#e8ecf1;box-shadow:0 4px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);transition:transform .15s ease,background .2s ease;}' +
-        '.si-btn:hover{transform:scale(1.06)}' +
-        '.si-btn svg{width:22px;height:22px;display:block}' +
-        '.si-wrap.listening .si-btn{background:#c62828;animation:si-pulse 1.4s ease infinite}' +
-        '.si-wrap.polishing .si-btn{background:#7b5cd6}' +
-        '.si-wrap.done .si-btn{background:#1d7a46}' +
-        '.si-wrap.error .si-btn{background:#8d6e00}' +
-        '@keyframes si-pulse{0%{box-shadow:0 0 0 0 rgba(198,40,40,.45)}70%{box-shadow:0 0 0 16px rgba(198,40,40,0)}100%{box-shadow:0 0 0 0 rgba(198,40,40,0)}}' +
-        '.si-pill{max-width:340px;background:#101418;color:#e8ecf1;border-radius:14px;padding:9px 14px;' +
+        '.mb-btn:hover{transform:scale(1.06)}' +
+        '.mb-btn svg{width:22px;height:22px;display:block}' +
+        '.mb-wrap.listening .mb-btn{background:#c62828;animation:mb-pulse 1.4s ease infinite}' +
+        '.mb-wrap.polishing .mb-btn{background:#7b5cd6}' +
+        '.mb-wrap.done .mb-btn{background:#1d7a46}' +
+        '.mb-wrap.error .mb-btn{background:#8d6e00}' +
+        '@keyframes mb-pulse{0%{box-shadow:0 0 0 0 rgba(198,40,40,.45)}70%{box-shadow:0 0 0 16px rgba(198,40,40,0)}100%{box-shadow:0 0 0 0 rgba(198,40,40,0)}}' +
+        '.mb-pill{max-width:340px;background:#101418;color:#e8ecf1;border-radius:14px;padding:9px 14px;' +
         'box-shadow:0 4px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-        '.si-wrap.listening .si-pill,.si-wrap.polishing .si-pill,.si-wrap.done .si-pill,.si-wrap.error .si-pill{display:block}' +
-        '.si-pill .si-hint{opacity:.55;font-weight:400}' +
-        '.si-pill .si-ok{color:#7ee2a8}' +
-        '.si-bars{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-right:8px;vertical-align:-1px}' +
-        '.si-bars i{width:3px;background:#ff8a80;border-radius:2px;animation:si-bar .9s ease-in-out infinite}' +
-        '.si-bars i:nth-child(2){animation-delay:.15s}.si-bars i:nth-child(3){animation-delay:.3s}.si-bars i:nth-child(4){animation-delay:.45s}' +
-        '@keyframes si-bar{0%,100%{height:4px}50%{height:12px}}';
+        '.mb-wrap.listening .mb-pill,.mb-wrap.polishing .mb-pill,.mb-wrap.done .mb-pill,.mb-wrap.error .mb-pill{display:block}' +
+        '.mb-pill .mb-hint{opacity:.55;font-weight:400}' +
+        '.mb-pill .mb-ok{color:#7ee2a8}' +
+        '.mb-bars{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-right:8px;vertical-align:-1px}' +
+        '.mb-bars i{width:3px;background:#ff8a80;border-radius:2px;animation:mb-bar .9s ease-in-out infinite}' +
+        '.mb-bars i:nth-child(2){animation-delay:.15s}.mb-bars i:nth-child(3){animation-delay:.3s}.mb-bars i:nth-child(4){animation-delay:.45s}' +
+        '@keyframes mb-bar{0%,100%{height:4px}50%{height:12px}}';
 
       var wrap = document.createElement('div');
-      wrap.className = 'si-wrap';
+      wrap.className = 'mb-wrap';
 
       var btn = document.createElement('button');
-      btn.className = 'si-btn';
+      btn.className = 'mb-btn';
       btn.type = 'button';
       btn.title = 'Dictate (' + this.opts.hotkey + ' to hold-and-talk, Esc to cancel)';
       btn.setAttribute('aria-label', 'Start dictation');
@@ -296,7 +302,7 @@
       if (!this.opts.button) btn.style.display = 'none';
 
       var pill = document.createElement('div');
-      pill.className = 'si-pill';
+      pill.className = 'mb-pill';
 
       var self = this;
       // mousedown preventDefault keeps focus in the user's input while clicking the mic.
@@ -319,14 +325,14 @@
       var ui = this.ui;
       var self = this;
       if (ui) {
-        ui.wrap.className = 'si-wrap' + (state !== 'idle' ? ' ' + state : '');
+        ui.wrap.className = 'mb-wrap' + (state !== 'idle' ? ' ' + state : '');
         if (state === 'listening') {
-          ui.pill.innerHTML = '<span class="si-bars"><i></i><i></i><i></i><i></i></span>' +
-            '<span class="si-text si-hint">Listening… release ' + this.opts.hotkey + ' or click mic to finish</span>';
+          ui.pill.innerHTML = '<span class="mb-bars"><i></i><i></i><i></i><i></i></span>' +
+            '<span class="mb-text mb-hint">Listening… release ' + this.opts.hotkey + ' or click mic to finish</span>';
         } else if (state === 'polishing') {
-          ui.pill.innerHTML = '<span class="si-text si-hint">✨ ' + (message || 'Polishing…') + '</span>';
+          ui.pill.innerHTML = '<span class="mb-text mb-hint">✨ ' + (message || 'Polishing…') + '</span>';
         } else if (state === 'done') {
-          ui.pill.innerHTML = '<span class="si-ok">✓ ' + (message || 'Done') + '</span>';
+          ui.pill.innerHTML = '<span class="mb-ok">✓ ' + (message || 'Done') + '</span>';
           setTimeout(function () { if (self.state === 'done') self._setState('idle'); }, 2200);
         } else if (state === 'error') {
           ui.pill.textContent = '⚠ ' + (message || 'Something went wrong');
@@ -338,9 +344,9 @@
 
     _showInterim: function (text) {
       if (this.state !== 'listening' || !this.ui) return;
-      var span = this.ui.pill.querySelector('.si-text');
+      var span = this.ui.pill.querySelector('.mb-text');
       if (span && text) {
-        span.className = 'si-text';
+        span.className = 'mb-text';
         span.textContent = text;
       }
     },
@@ -446,7 +452,11 @@
           self._setState('polishing', 'Transcribing…');
           fetch(self.opts.transcribeEndpoint, {
             method: 'POST',
-            headers: { 'Content-Type': blob.type, 'X-SpeakIt-Lang': self.opts.lang },
+            headers: {
+              'Content-Type': blob.type,
+              'X-Mockingbird-Lang': self.opts.lang,
+              'X-Mockingbird-User': self.opts.userId || ''
+            },
             body: blob
           })
             .then(function (r) { if (!r.ok) throw new Error('Transcription failed (' + r.status + ')'); return r.json(); })
@@ -460,7 +470,7 @@
 
     // ------------------------------------------------------ finish pipeline
 
-    // Entry point after transcription (also used by SpeakIt.simulate()).
+    // Entry point after transcription (also used by Mockingbird.simulate()).
     _finish: function (raw) {
       raw = (raw || '').trim();
       if (!raw) { this._setState('idle'); return; }
@@ -473,7 +483,8 @@
       }
     },
 
-    // Voice actions: ask the endpoint whether this is a command or dictation.
+    // Voice actions: ask Claude whether this is command(s) or dictation.
+    // One utterance can yield several actions (e.g. multiple contacts).
     _resolveAction: function (raw) {
       var self = this;
       this._setState('polishing', 'Understanding…');
@@ -484,14 +495,24 @@
           text: raw,
           actions: this.opts.actions,
           appContext: this.opts.appContext || document.title,
-          dictionary: this._dictionary()
+          dictionary: this._dictionary(),
+          user: this.opts.userId
         })
       })
         .then(function (r) { if (!r.ok) throw new Error('actions ' + r.status); return r.json(); })
         .then(function (data) {
-          if (data && data.kind === 'action' && data.name) {
-            var label = data.label || data.name.replace(/_/g, ' ');
-            if (typeof self.opts.onAction === 'function') self.opts.onAction(data.name, data.input || {});
+          var list = null;
+          if (data && data.kind === 'actions' && Array.isArray(data.actions)) list = data.actions;
+          else if (data && data.kind === 'action' && data.name) list = [{ name: data.name, input: data.input }];
+          if (list && list.length) {
+            list.forEach(function (a) {
+              if (a && a.name && typeof self.opts.onAction === 'function') {
+                self.opts.onAction(a.name, a.input || {});
+              }
+            });
+            var label = list.length === 1
+              ? list[0].name.replace(/_/g, ' ')
+              : list.length + ' items added';
             self._setState('done', label);
           } else if (data && data.kind === 'dictation' && data.text) {
             self._insert(String(data.text).trim());
@@ -506,7 +527,7 @@
         });
     },
 
-    // AI cleanup. With liveInsert, raw words land instantly and get swapped
+    // Claude cleanup. With liveInsert, raw words land instantly and get swapped
     // for the polished version when it arrives (inputs/textareas only —
     // contenteditable editors get the polished text once, to stay framework-safe).
     _polish: function (raw) {
@@ -524,7 +545,8 @@
           text: raw,
           tone: this.opts.tone,
           appContext: this.opts.appContext || document.title,
-          dictionary: this._dictionary()
+          dictionary: this._dictionary(),
+          user: this.opts.userId
         })
       })
         .then(function (r) { if (!r.ok) throw new Error('format ' + r.status); return r.json(); })
@@ -650,7 +672,7 @@
 
     init: function (options) {
       if (instance) instance.destroy();
-      instance = new SpeakItInstance(options);
+      instance = new MockingbirdInstance(options);
       return api;
     },
 
@@ -662,7 +684,7 @@
       return api;
     },
 
-    /** Teach the recognizer/AI a word: agent names, neighborhoods, jargon. */
+    /** Teach Mockingbird a word: agent names, neighborhoods, jargon. */
     learn: function (word) {
       word = String(word || '').trim();
       if (!word) return api;
@@ -702,6 +724,7 @@
     _autoInit: function () {
       if (instance) return;
       var script = document.currentScript ||
+        document.querySelector('script[src*="mockingbird"]') ||
         document.querySelector('script[src*="speakit"]');
       var opts = {};
       if (script) {
@@ -715,6 +738,7 @@
         if (d.tone) opts.tone = d.tone;
         if (d.position) opts.position = d.position;
         if (d.appContext) opts.appContext = d.appContext;
+        if (d.userId) opts.userId = d.userId;
         if (d.liveInsert === 'false') opts.liveInsert = false;
         if (d.button === 'false') opts.button = false;
         if (d.manual === 'true') return; // opt out of auto-init

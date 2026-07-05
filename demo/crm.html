@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CT Speak-It — CRM Voice Actions Demo</title>
+<title>Mockingbird — CRM Voice Actions Demo</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -53,19 +53,23 @@
 </head>
 <body>
   <header>
-    <h1><span class="accent">●</span> APU Dashboard <span style="color:#8b949e;font-weight:400">· voice demo</span></h1>
-    <span class="sub">Hold <kbd>Ctrl</kbd>+<kbd>Space</kbd> and say: <i>“Open house at 123 Main Street this Saturday at 2pm, hosted by Sarah”</i></span>
+    <h1><span class="accent">🐦</span> APU Dashboard <span style="color:#8b949e;font-weight:400">· voice demo</span></h1>
+    <span class="sub">Hold <kbd>Ctrl</kbd>+<kbd>Space</kbd> and just talk — one sentence can create several contacts, an open house, and a task at once</span>
   </header>
 
   <div class="try">
     <b>No mic handy?</b> Type what you would have said and hit Speak — it runs the exact same pipeline.
     <div class="simbar">
-      <input id="sim" type="text" value="Open house at 123 Main Street this Saturday at 2 p.m. hosted by Sarah, bring the new flyers">
+      <input id="sim" type="text" value="Just wrapped the open house at 123 Main Street — three people came through: John Doe 555-0142 john at gmail dot com, Maria Lopez 555-0177, and Sam Chen, sam@chen.io — follow up with all of them Monday">
       <button id="simGo" type="button">Speak ➤</button>
     </div>
   </div>
 
   <div class="board">
+    <div class="col">
+      <h2>👤 Contacts</h2>
+      <div id="contacts"><div class="empty">Say “just met John Doe, 555-1234, john@x.com”</div></div>
+    </div>
     <div class="col">
       <h2>🏠 Open Houses</h2>
       <div id="openhouses"><div class="empty">Say “open house at …” to add one</div></div>
@@ -83,10 +87,25 @@
     </div>
   </div>
 
-  <script src="../src/speakit.js" data-manual="true"></script>
+  <script src="../src/mockingbird.js" data-manual="true"></script>
   <script>
     // ---- 1. Define the actions this dashboard understands -------------------
     var ACTIONS = [
+      {
+        name: 'create_contact',
+        description: 'Save a new contact or lead. Trigger whenever the speaker gives a person\'s name with contact details or says they met/talked to someone new. If several people are mentioned, create one contact per person.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            phone: { type: 'string' },
+            email: { type: 'string' },
+            source: { type: 'string', description: 'How we met them, e.g. "open house at 123 Main St"' },
+            notes: { type: 'string' }
+          },
+          required: ['name']
+        }
+      },
       {
         name: 'create_open_house',
         description: 'Schedule an open house showing for a property. Trigger when the speaker mentions an open house, a showing, or hosting buyers at a property.',
@@ -145,7 +164,11 @@
     }
 
     function handleAction(name, input) {
-      if (name === 'create_open_house') {
+      if (name === 'create_contact') {
+        card('#contacts', '👤 ' + (input.name || 'Contact'), {
+          phone: input.phone, email: input.email, source: input.source, notes: input.notes
+        });
+      } else if (name === 'create_open_house') {
         card('#openhouses', '🏠 ' + (input.address || 'Open house'), {
           date: input.date, time: input.time, host: input.host, notes: input.notes
         });
@@ -157,8 +180,8 @@
       // In your real CRM this is where you'd POST to your own backend.
     }
 
-    // ---- 3. Wire up SpeakIt --------------------------------------------------
-    SpeakIt.init({
+    // ---- 3. Wire up Mockingbird --------------------------------------------------
+    Mockingbird.init({
       actions: ACTIONS,
       actionsEndpoint: '/api/actions',
       formatEndpoint: '/api/format',
@@ -169,7 +192,7 @@
     });
 
     document.getElementById('simGo').addEventListener('click', function () {
-      SpeakIt.simulate(document.getElementById('sim').value);
+      Mockingbird.simulate(document.getElementById('sim').value);
     });
 
     // ---- Offline fallback (demo only) ---------------------------------------

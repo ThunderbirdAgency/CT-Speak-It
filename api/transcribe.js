@@ -1,18 +1,18 @@
 /**
- * CT Speak-It — Whisper-grade transcription proxy.
+ * Mockingbird — Whisper-grade transcription proxy.
  *
  * Closes the accuracy gap with desktop dictation apps: instead of the browser's
  * built-in recognizer, audio is transcribed by a Whisper-class model. Deploy once,
  * point every build at it:
  *
- *   <script src="speakit.js" data-transcribe-endpoint="https://your-app.vercel.app/api/transcribe"></script>
+ *   <script src="mockingbird.js" data-transcribe-endpoint="https://your-app.vercel.app/api/transcribe"></script>
  *
  * Set ONE of these env vars (checked in order — first match wins):
  *   GROQ_API_KEY      → whisper-large-v3-turbo on Groq (fastest, near-free)
  *   DEEPGRAM_API_KEY  → nova-3 on Deepgram
  *   OPENAI_API_KEY    → whisper-1 on OpenAI
  *
- * Request:  POST raw audio body (audio/webm etc.), X-SpeakIt-Lang header optional
+ * Request:  POST raw audio body (audio/webm etc.), X-Mockingbird-Lang header optional
  * Response: { text: string }
  */
 
@@ -24,7 +24,7 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-SpeakIt-Lang'
+    'Access-Control-Allow-Headers': 'Content-Type, X-Mockingbird-Lang, X-Mockingbird-User, X-SpeakIt-Lang'
   };
 }
 
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   const contentType = req.headers['content-type'] || 'audio/webm';
-  const lang = req.headers['x-speakit-lang'] || '';
+  const lang = req.headers['x-mockingbird-lang'] || req.headers['x-speakit-lang'] || '';
 
   let audio;
   try {
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ text });
   } catch (err) {
-    console.error('speakit transcribe error:', err);
+    console.error('mockingbird transcribe error:', err);
     return res.status(502).json({ error: 'Transcription failed' });
   }
 }

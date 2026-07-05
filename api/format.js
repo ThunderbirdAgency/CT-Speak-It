@@ -1,16 +1,17 @@
 /**
- * CT Speak-It — AI transcript formatter ("Flow formatting").
+ * Mockingbird — Claude transcript formatter.
  *
  * Vercel serverless function. Deploy this repo (or copy this file into any
  * Vercel/Next.js project's /api folder), set ANTHROPIC_API_KEY in the project
  * env, and point the widget at it:
  *
- *   <script src="speakit.js" data-format-endpoint="https://your-app.vercel.app/api/format"></script>
+ *   <script src="mockingbird.js" data-format-endpoint="https://your-app.vercel.app/api/format"></script>
  *
- * Request:  POST { text: string, tone?: string, appContext?: string }
+ * Request:  POST { text: string, tone?: string, appContext?: string, dictionary?: string[], user?: string }
  * Response: { text: string }
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { logEvent } from './_lib/log.js';
 
 const client = new Anthropic();
 
@@ -50,7 +51,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { text, tone = 'clean', appContext = '', dictionary = [] } = req.body || {};
+  const { text, tone = 'clean', appContext = '', dictionary = [], user = null } = req.body || {};
+  const startedAt = Date.now();
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'Missing "text"' });
   }
@@ -88,9 +90,15 @@ export default async function handler(req, res) {
       .join('')
       .trim();
 
+    logEvent({
+      app: appContext, user_id: user, kind: 'dictation',
+      raw_text: text, output_text: cleaned || text,
+      duration_ms: Date.now() - startedAt,
+      meta: { model: response.model, tone, via: 'format' }
+    });
     return res.status(200).json({ text: cleaned || text });
   } catch (err) {
-    console.error('speakit format error:', err);
+    console.error('mockingbird format error:', err);
     // Widget falls back to the raw transcript on any non-200.
     return res.status(502).json({ error: 'Formatting failed' });
   }
