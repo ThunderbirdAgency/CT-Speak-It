@@ -45,7 +45,7 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
 
-  var VERSION = '3.0.0';
+  var VERSION = '3.1.0';
   var DICT_STORAGE_KEY = 'mockingbird.dictionary';
   var LEGACY_DICT_KEY = 'speakit.dictionary';
 
@@ -269,23 +269,33 @@
         '.mb-wrap{position:fixed;' + pos + 'z-index:' + this.opts.zIndex + ';display:flex;align-items:center;gap:10px;' +
         'font:500 13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;flex-direction:row-reverse;}' +
         '.mb-btn{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
-        'background:#101418;color:#e8ecf1;box-shadow:0 4px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);transition:transform .15s ease,background .2s ease;}' +
-        '.mb-btn:hover{transform:scale(1.06)}' +
-        '.mb-btn svg{width:22px;height:22px;display:block}' +
-        '.mb-wrap.listening .mb-btn{background:#c62828;animation:mb-pulse 1.4s ease infinite}' +
-        '.mb-wrap.polishing .mb-btn{background:#7b5cd6}' +
-        '.mb-wrap.done .mb-btn{background:#1d7a46}' +
-        '.mb-wrap.error .mb-btn{background:#8d6e00}' +
-        '@keyframes mb-pulse{0%{box-shadow:0 0 0 0 rgba(198,40,40,.45)}70%{box-shadow:0 0 0 16px rgba(198,40,40,0)}100%{box-shadow:0 0 0 0 rgba(198,40,40,0)}}' +
-        '.mb-pill{max-width:340px;background:#101418;color:#e8ecf1;border-radius:14px;padding:9px 14px;' +
-        'box-shadow:0 4px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-        '.mb-wrap.listening .mb-pill,.mb-wrap.polishing .mb-pill,.mb-wrap.done .mb-pill,.mb-wrap.error .mb-pill{display:block}' +
+        'background:linear-gradient(180deg,#1a2027,#0c1014);color:#e8ecf1;' +
+        'box-shadow:0 6px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.09),inset 0 0 0 1px rgba(255,255,255,.06);' +
+        'transition:transform .25s cubic-bezier(.2,1.6,.4,1),background .3s ease,box-shadow .3s ease;}' +
+        '.mb-btn:hover{transform:scale(1.08)}' +
+        '.mb-btn:active{transform:scale(.94)}' +
+        '.mb-btn svg{width:22px;height:22px;display:block;transition:transform .25s cubic-bezier(.2,1.6,.4,1)}' +
+        '.mb-wrap.listening .mb-btn{background:linear-gradient(180deg,#e04545,#a81f1f);animation:mb-pulse 1.6s ease infinite}' +
+        '.mb-wrap.listening .mb-btn svg{transform:scale(1.12)}' +
+        '.mb-wrap.polishing .mb-btn{background:linear-gradient(180deg,#8d6ee8,#6a48c8)}' +
+        '.mb-wrap.done .mb-btn{background:linear-gradient(180deg,#2a9d5e,#177a42)}' +
+        '.mb-wrap.error .mb-btn{background:linear-gradient(180deg,#b08b12,#7a5f00)}' +
+        '@keyframes mb-pulse{0%{box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 0 0 rgba(224,69,69,.4)}70%{box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 0 18px rgba(224,69,69,0)}100%{box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 0 0 rgba(224,69,69,0)}}' +
+        '.mb-pill{max-width:360px;background:rgba(13,17,23,.82);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);' +
+        'color:#e8ecf1;border-radius:16px;padding:10px 15px;' +
+        'box-shadow:0 6px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.06);' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+        'opacity:0;transform:translateX(12px) scale(.95);pointer-events:none;' +
+        'transition:opacity .28s ease,transform .34s cubic-bezier(.2,1.5,.4,1);}' +
+        '.mb-wrap.listening .mb-pill,.mb-wrap.polishing .mb-pill,.mb-wrap.done .mb-pill,.mb-wrap.error .mb-pill{opacity:1;transform:translateX(0) scale(1)}' +
         '.mb-pill .mb-hint{opacity:.55;font-weight:400}' +
         '.mb-pill .mb-ok{color:#7ee2a8}' +
-        '.mb-bars{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-right:8px;vertical-align:-1px}' +
-        '.mb-bars i{width:3px;background:#ff8a80;border-radius:2px;animation:mb-bar .9s ease-in-out infinite}' +
-        '.mb-bars i:nth-child(2){animation-delay:.15s}.mb-bars i:nth-child(3){animation-delay:.3s}.mb-bars i:nth-child(4){animation-delay:.45s}' +
-        '@keyframes mb-bar{0%,100%{height:4px}50%{height:12px}}';
+        '.mb-bars{display:inline-flex;gap:2.5px;align-items:center;height:16px;margin-right:9px;vertical-align:-3px}' +
+        '.mb-bars i{width:3px;height:4px;background:#ff9d94;border-radius:2px;transition:height .08s ease}' +
+        '.mb-bars:not(.mb-live) i{animation:mb-bar 1s ease-in-out infinite}' +
+        '.mb-bars:not(.mb-live) i:nth-child(2){animation-delay:.12s}.mb-bars:not(.mb-live) i:nth-child(3){animation-delay:.24s}' +
+        '.mb-bars:not(.mb-live) i:nth-child(4){animation-delay:.36s}.mb-bars:not(.mb-live) i:nth-child(5){animation-delay:.48s}' +
+        '@keyframes mb-bar{0%,100%{height:4px}50%{height:13px}}';
 
       var wrap = document.createElement('div');
       wrap.className = 'mb-wrap';
@@ -321,13 +331,14 @@
     },
 
     _setState: function (state, message) {
+      if (state !== 'listening') this._stopMeter();
       this.state = state;
       var ui = this.ui;
       var self = this;
       if (ui) {
         ui.wrap.className = 'mb-wrap' + (state !== 'idle' ? ' ' + state : '');
         if (state === 'listening') {
-          ui.pill.innerHTML = '<span class="mb-bars"><i></i><i></i><i></i><i></i></span>' +
+          ui.pill.innerHTML = '<span class="mb-bars"><i></i><i></i><i></i><i></i><i></i></span>' +
             '<span class="mb-text mb-hint">Listening… release ' + this.opts.hotkey + ' or click mic to finish</span>';
         } else if (state === 'polishing') {
           ui.pill.innerHTML = '<span class="mb-text mb-hint">✨ ' + (message || 'Polishing…') + '</span>';
@@ -352,6 +363,51 @@
     },
 
     // ------------------------------------------------------------ recording
+
+    // Real voice-level waveform: five bars driven by mic amplitude.
+    _startMeter: function (stream) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC || !this.ui) return;
+      try {
+        var ctx = new AC();
+        var analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.75;
+        ctx.createMediaStreamSource(stream).connect(analyser);
+        var data = new Uint8Array(analyser.frequencyBinCount);
+        var self = this;
+        this._meter = { ctx: ctx, raf: 0, ownStream: null };
+        var tick = function () {
+          if (!self._meter) return;
+          var barsEl = self.ui.pill.querySelector('.mb-bars');
+          if (barsEl) {
+            barsEl.classList.add('mb-live');
+            analyser.getByteFrequencyData(data);
+            var sum = 0;
+            for (var i = 2; i < 40; i++) sum += data[i];
+            var level = Math.min(1, (sum / 38) / 140);
+            var bars = barsEl.children;
+            for (var b = 0; b < bars.length; b++) {
+              var weight = 0.55 + 0.45 * Math.sin((b + 1) * 1.7 + Date.now() / 90);
+              bars[b].style.height = Math.max(3, Math.round(3 + level * weight * 14)) + 'px';
+            }
+          }
+          self._meter.raf = requestAnimationFrame(tick);
+        };
+        this._meter.raf = requestAnimationFrame(tick);
+      } catch (e) { /* meter is decorative — never block dictation */ }
+    },
+
+    _stopMeter: function () {
+      if (!this._meter) return;
+      cancelAnimationFrame(this._meter.raf);
+      try { this._meter.ctx.close(); } catch (e) {}
+      if (this._meter.ownStream) {
+        this._meter.ownStream.getTracks().forEach(function (t) { t.stop(); });
+      }
+      this._meter = null;
+    },
+
 
     start: function () {
       if (this.state === 'listening') return;
@@ -435,6 +491,13 @@
       };
       this.recognition = rec;
       rec.start();
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+          if (self.state !== 'listening') { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+          self._startMeter(stream);
+          if (self._meter) self._meter.ownStream = stream;
+        }).catch(function () { /* keep the idle animation */ });
+      }
     },
 
     _startServer: function () {
@@ -465,6 +528,7 @@
         };
         self.mediaRecorder = mr;
         mr.start();
+        self._startMeter(stream);
       }).catch(function () { self._fail('Microphone access denied'); });
     },
 
