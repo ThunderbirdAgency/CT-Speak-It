@@ -1,0 +1,37 @@
+{
+  "name": "mockingbird-desktop",
+  "productName": "Mockingbird",
+  "version": "0.1.0",
+  "description": "Mockingbird desktop — system-wide voice dictation for Mac and Windows, powered by your Mockingbird deployment.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "com.thunderbird.mockingbird",
+    "productName": "Mockingbird",
+    "files": [
+      "main.js",
+      "preload.js",
+      "overlay.html"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Mockingbird uses the microphone for voice dictation."
+      }
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

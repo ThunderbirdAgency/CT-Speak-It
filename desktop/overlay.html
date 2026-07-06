@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+  .pill {
+    box-sizing: border-box;
+    margin: 8px;
+    height: 80px;
+    border-radius: 20px;
+    background: rgba(13, 17, 23, .88);
+    backdrop-filter: blur(14px) saturate(1.4);
+    box-shadow: 0 8px 28px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.09), inset 0 0 0 1px rgba(255,255,255,.06);
+    color: #e8ecf1;
+    font: 500 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; align-items: center; gap: 12px; padding: 0 18px;
+  }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%; flex: none;
+    background: #e04545; animation: pulse 1.5s ease infinite;
+  }
+  .pill.polishing .dot { background: #8d6ee8; animation: none; }
+  .pill.done .dot { background: #2a9d5e; animation: none; }
+  .pill.error .dot { background: #b08b12; animation: none; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: .7; } }
+  .bars { display: inline-flex; gap: 3px; align-items: center; height: 20px; flex: none; }
+  .bars i { width: 3.5px; height: 5px; background: #ff9d94; border-radius: 2px; transition: height .08s ease; }
+  .text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .9; }
+  .hint { opacity: .5; font-weight: 400; }
+</style>
+</head>
+<body>
+  <div class="pill" id="pill">
+    <div class="dot"></div>
+    <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="text" id="text"><span class="hint">Listening…</span></div>
+  </div>
+
+<script>
+(function () {
+  var pill = document.getElementById('pill');
+  var textEl = document.getElementById('text');
+  var bars = document.getElementById('bars').children;
+  var config = null;
+  var recorder = null, chunks = [], meter = null;
+
+  function setState(state, message) {
+    pill.className = 'pill' + (state !== 'listening' ? ' ' + state : '');
+    textEl.innerHTML = '';
+    var span = document.createElement('span');
+    if (state === 'listening') { span.className = 'hint'; span.textContent = message || 'Listening… press the hotkey again to finish'; }
+    else if (state === 'polishing') { span.className = 'hint'; span.textContent = '✨ ' + (message || 'Polishing…'); }
+    else if (state === 'done') { span.textContent = '✓ ' + (message || 'Inserted'); }
+    else if (state === 'error') { span.textContent = '⚠ ' + (message || 'Something went wrong'); }
+    textEl.appendChild(span);
+    if (state !== 'listening' && state !== 'polishing') window.mb.state(state === 'done' ? 'idle' : state);
+  }
+
+  function startMeter(stream) {
+    try {
+      var ctx = new AudioContext();
+      var analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      var data = new Uint8Array(analyser.frequencyBinCount);
+      meter = { ctx: ctx, raf: 0 };
+      var tick = function () {
+        if (!meter) return;
+        analyser.getByteFrequencyData(data);
+        var sum = 0;
+        for (var i = 2; i < 40; i++) sum += data[i];
+        var level = Math.min(1, (sum / 38) / 140);
+        for (var b = 0; b < bars.length; b++) {
+          var weight = 0.55 + 0.45 * Math.sin((b + 1) * 1.7 + Date.now() / 90);
+          bars[b].style.height = Math.max(4, Math.round(4 + level * weight * 16)) + 'px';
+        }
+        meter.raf = requestAnimationFrame(tick);
+      };
+      meter.raf = requestAnimationFrame(tick);
+    } catch (e) { /* decorative */ }
+  }
+
+  function stopMeter() {
+    if (!meter) return;
+    cancelAnimationFrame(meter.raf);
+    try { meter.ctx.close(); } catch (e) {}
+    meter = null;
+  }
+
+  function begin(cfg) {
+    config = cfg;
+    setState('listening');
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      chunks = [];
+      recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      recorder.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+      recorder.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        stopMeter();
+        transcribe(new Blob(chunks, { type: 'audio/webm' }));
+      };
+      recorder.start();
+      startMeter(stream);
+    }).catch(function () { setState('error', 'Microphone access denied'); });
+  }
+
+  function finish() {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  }
+
+  function transcribe(blob) {
+    setState('polishing', 'Transcribing…');
+    var base = (config.baseUrl || '').replace(/\/$/, '');
+    fetch(base + '/api/transcribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'audio/webm',
+        'X-Mockingbird-Lang': config.lang || 'en-US',
+        'X-Mockingbird-User': config.userId || ''
+      },
+      body: blob
+    })
+      .then(function (r) { if (!r.ok) throw new Error('transcribe ' + r.status); return r.json(); })
+      .then(function (data) { polish((data.text || '').trim()); })
+      .catch(function (err) { setState('error', 'Transcription failed — check baseUrl in Settings'); });
+  }
+
+  function polish(raw) {
+    if (!raw) { setState('error', 'Heard nothing'); return; }
+    setState('polishing');
+    var base = (config.baseUrl || '').replace(/\/$/, '');
+    fetch(base + '/api/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: raw,
+        tone: config.tone || 'clean',
+        appContext: 'desktop dictation into an arbitrary application',
+        user: config.userId || ''
+      })
+    })
+      .then(function (r) { if (!r.ok) throw new Error('format ' + r.status); return r.json(); })
+      .then(function (data) { deliver((data.text || raw).trim()); })
+      .catch(function () { deliver(raw); }); // formatter down → raw transcript
+  }
+
+  function deliver(text) {
+    setState('done');
+    window.mb.insert(text);
+  }
+
+  window.mb.onBegin(begin);
+  window.mb.onFinish(finish);
+})();
+</script>
+</body>
+</html>
