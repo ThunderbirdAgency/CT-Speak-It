@@ -12,7 +12,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('mb', {
   onListen: (cb) => ipcRenderer.on('mb:listen', (e, payload) => cb(payload)),
   onStop: (cb) => ipcRenderer.on('mb:stop', () => cb()),
-  onCancel: (cb) => ipcRenderer.on('mb:cancel', () => cb()),
+  onCancel: (cb) => ipcRenderer.on('mb:cancel', (e, payload) => cb(payload || {})),
   onStatus: (cb) => ipcRenderer.on('mb:status', (e, payload) => cb(payload)),
   onConfirm: (cb) => ipcRenderer.on('mb:confirm', (e, payload) => cb(payload)),
 

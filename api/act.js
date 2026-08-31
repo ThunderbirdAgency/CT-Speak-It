@@ -70,5 +70,9 @@ export default async function handler(req, res) {
   });
 
   const anyOk = results.some((r) => r.ok);
-  return res.status(anyOk ? 200 : 502).json({ results });
+  if (anyOk) return res.status(200).json({ results });
+  // Nothing worked: put the reason in `error` too, so clients that only look at
+  // the status code still have something to show the user.
+  const firstError = results.map((r) => r.error).find(Boolean) || 'Action failed';
+  return res.status(502).json({ results, error: firstError });
 }

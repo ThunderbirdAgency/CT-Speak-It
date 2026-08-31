@@ -19,6 +19,7 @@ const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'mockingbird-smoke-'));
 // ------------------------------------------------------------ electron stub
 
 const sent = [];            // everything main sent to the overlay
+const hides = [];           // every time main hid the overlay
 const ipcOn = {};
 const ipcHandle = {};
 const shortcuts = {};
@@ -32,7 +33,8 @@ const overlayStub = {
   isDestroyed: () => false,
   webContents: { send: (channel, payload) => sent.push({ channel, payload }), setWindowOpenHandler() {} },
   setVisibleOnAllWorkspaces() {}, setAlwaysOnTop() {}, loadFile() {}, setPosition() {},
-  getSize: () => [460, 260], showInactive() {}, show() {}, focus() {}, blur() {}, hide() {},
+  getSize: () => [460, 260], showInactive() {}, show() {}, focus() {}, blur() {},
+  hide() { hides.push(Date.now()); },
   once(event, cb) { if (event === 'ready-to-show') cb(); }, on() {}, setMenuBarVisibility() {}
 };
 
@@ -198,6 +200,26 @@ function check(name, fn) {
     assert.strictEqual(calls.filter((c) => c.route === '/api/act').length, actsBefore);
     assert.strictEqual(history()[0].kind, 'command (cancelled)');
   });
+
+  console.log('switching modes mid-sentence');
+  hides.length = 0;
+  shortcuts['CommandOrControl+Shift+Space']();
+  shortcuts['CommandOrControl+Shift+K']();
+  check('the running recording is cancelled silently', () => {
+    assert.strictEqual(lastSent('mb:cancel').payload.silent, true);
+  });
+  check('and the new session starts in the mode asked for', () => {
+    assert.strictEqual(lastSent('mb:listen').payload.mode, 'command');
+  });
+  // The overlay's own acknowledgement would arrive here in the real app; it
+  // must not tear down the session that just started.
+  check('a late acknowledgement does not hide the new session', () => {
+    assert.strictEqual(hides.length, 0);
+  });
+  ipcOn['mb:audio'](null, { buffer: new Uint8Array([1]), mode: 'command' });
+  await wait(60);
+  ipcOn['mb:confirm-response'](null, { accept: false });
+  await wait(20);
 
   console.log('dictation: plain text goes to the clipboard');
   clipboardText = 'user clipboard';

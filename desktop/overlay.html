@@ -218,11 +218,13 @@
     recorder.stop();
   }
 
-  function cancel() {
+  function cancel(options) {
     if (recorder && recorder.state === 'recording') { recorder.onstop = null; recorder.stop(); }
     teardown();
     clearConfirm();
-    window.mb.cancelled();
+    // A silent cancel comes from main (switching modes) and has already been
+    // accounted for there; anything else is the user pressing Escape.
+    if (!options || !options.silent) window.mb.cancelled();
   }
 
   function deliverAudio() {

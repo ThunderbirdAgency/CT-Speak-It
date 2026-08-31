@@ -8,6 +8,15 @@ Mockingbird is Thunderbird's shared voice layer. One central deployment serves
 every app; adding it to a new app is a script tag plus (optionally) a list of
 voice actions.
 
+Two kinds of action exist and they behave differently — get this right and the
+rest is mechanical:
+
+- **This app's actions** (step 3) go to your `onAction` handler. Your app owns
+  the UI and the undo, so they run immediately.
+- **Connector actions** (step 5, optional) are executed by Mockingbird against
+  a real outside system — Follow Up Boss and friends. Those show the user what
+  is about to happen and wait for Enter.
+
 ## 0. Find the deployment URL
 
 Ask the user for the Mockingbird deployment URL if it isn't already in the
@@ -24,6 +33,7 @@ In the app's root HTML template (or layout component), before `</body>`:
         data-transcribe-endpoint="{BASE}/api/transcribe"
         data-format-endpoint="{BASE}/api/format"
         data-actions-endpoint="{BASE}/api/actions"
+        data-act-endpoint="{BASE}/api/act"
         data-app-context="DESCRIBE THIS APP, e.g. 'Real-estate CRM: contacts, open houses, tasks'"
         data-manual="true"></script>
 ```
@@ -44,6 +54,7 @@ Mockingbird.init({
   transcribeEndpoint: '{BASE}/api/transcribe',
   formatEndpoint: '{BASE}/api/format',
   actionsEndpoint: '{BASE}/api/actions',
+  actEndpoint: '{BASE}/api/act',
   appContext: 'SAME DESCRIPTION AS ABOVE',
   userId: currentUser.id,               // however this app identifies users
   actions: ACTIONS,                     // see step 3
@@ -137,7 +148,21 @@ Use the app's existing data layer (REST call, Supabase insert, store action).
 Add optimistic UI (toast/card animation) if the app has a pattern for it —
 Mockingbird already shows a green "✓ …" pill on the mic.
 
-## 5. Verify
+## 5. Optional — let it act on outside systems
+
+Only if this app's users work in a system the deployment can reach (Follow Up
+Boss today). One line:
+
+```js
+Mockingbird.connect('followupboss');
+```
+
+Pass a connector NAME, never an API key — page source is public. The
+deployment supplies credentials from its own environment
+(`FOLLOWUPBOSS_API_KEY`). Users get a confirmation card and press Enter before
+anything is written. See `docs/CONNECTORS.md`.
+
+## 6. Verify
 
 1. Run the app over HTTPS or localhost (mic requires it).
 2. Console: `Mockingbird.version` → should print the version.
@@ -146,10 +171,12 @@ Mockingbird already shows a green "✓ …" pill on the mic.
 4. Click a text field, `Mockingbird.simulate('um testing one two three period')`
    → polished text appears at the cursor.
 5. Real mic test: hold **Ctrl+Space**, speak, release.
+6. If you enabled a connector: say something that matches one of its commands
+   and confirm a card appears and **nothing happens until you press Enter**.
 
 ## Notes
 
 - **Hotkey conflicts:** if the app already uses Ctrl+Space, pass `hotkey: 'Alt+M'` (or similar) to `init`.
 - **Dictionary:** seed app-specific vocabulary via `dictionary: ['APU', 'Poinciana', ...]`; users add their own with `Mockingbird.learn(word)`.
-- **Analytics:** if the deployment has `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set, every dictation/action is logged to the `mockingbird_events` table automatically — pass `userId` so events are attributable.
+- **Analytics and learning:** if the deployment has `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set, every dictation/action is logged to `mockingbird_events`, and each user's writing style is learned so their dictation comes out sounding like them — pass `userId` — without it, neither the log nor the profile can be attributed. Users can read and erase their own profile; pass `learn: false` to opt this app out entirely. See `docs/LEARNING.md`.
 - **Never** call the Anthropic/Groq APIs directly from the app — always go through the `{BASE}` endpoints so keys stay server-side.

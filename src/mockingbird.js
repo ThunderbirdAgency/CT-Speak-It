@@ -464,6 +464,7 @@
     },
 
     toggle: function () {
+      if (this._pendingConfirm) return;   // the confirmation card owns the click
       if (this.state === 'listening') { this.stop(); }
       else { this.toggled = true; this.start(); }
     },

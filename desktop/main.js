@@ -223,8 +223,14 @@ function beginListening(mode) {
 function toggle(mode) {
   if (pendingConfirm) return;              // the hotkey shouldn't fight the confirm card
   if (listening && mode === currentMode) send('mb:stop');
-  else if (listening) { send('mb:cancel'); listening = false; beginListening(mode); }
-  else beginListening(mode);
+  else if (listening) {
+    // Switching modes mid-listen: tear the recording down without the overlay
+    // reporting back, or its acknowledgement would arrive after the new
+    // session had already started and hide the window again.
+    send('mb:cancel', { silent: true });
+    listening = false;
+    beginListening(mode);
+  } else beginListening(mode);
 }
 
 /** Audio has arrived from the overlay: transcribe, decide, act. */
@@ -265,7 +271,7 @@ async function handleAudio(buffer, mode) {
         });
       } catch (err) {
         // Action routing unavailable — never lose the words.
-        return finishDictation(raw, cfg, { degraded: true });
+        return finishDictation(raw, cfg);
       }
       if (decision && decision.kind === 'actions' && decision.actions && decision.actions.length) {
         return proposeActions(decision.actions, raw, cfg);
@@ -274,7 +280,7 @@ async function handleAudio(buffer, mode) {
       return deliverText(cleaned, raw, cfg, 'dictation');
     }
 
-    return finishDictation(raw, cfg, {});
+    return finishDictation(raw, cfg);
   } catch (err) {
     console.error('mockingbird:', err.message);
     status('error', err.message);
@@ -283,7 +289,7 @@ async function handleAudio(buffer, mode) {
   }
 }
 
-async function finishDictation(raw, cfg, { degraded }) {
+async function finishDictation(raw, cfg) {
   try {
     status('working', 'Polishing…', raw);
     const formatted = await api('/api/format', {
@@ -299,7 +305,7 @@ async function finishDictation(raw, cfg, { degraded }) {
     return deliverText((formatted.text || raw).trim(), raw, cfg, 'dictation');
   } catch (err) {
     // Formatter down → the raw transcript still goes in. Words are never lost.
-    return deliverText(raw, raw, cfg, degraded ? 'dictation (raw)' : 'dictation (raw)');
+    return deliverText(raw, raw, cfg, 'dictation (raw)');
   }
 }
 
@@ -326,7 +332,9 @@ function proposeActions(actions, transcript, cfg) {
   // App-owned actions can't run from the desktop (there is no app here to
   // handle them); connector actions can.
   const runnable = actions.filter((a) => a.execute);
-  if (!runnable.length) return deliverText(transcript, transcript, cfg, 'dictation');
+  // Nothing here the desktop can run (an app-owned action with no app in
+  // front of it) — treat what they said as dictation rather than dropping it.
+  if (!runnable.length) return finishDictation(transcript, cfg);
 
   if (cfg.confirmActions === false) return runActions(runnable, transcript, cfg);
 
