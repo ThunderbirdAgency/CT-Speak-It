@@ -16,17 +16,9 @@
  * Response: { text: string }
  */
 
-export const config = { api: { bodyParser: false } };
+import { preflight } from './_lib/http.js';
 
-function corsHeaders(origin) {
-  const allowed = (process.env.ALLOWED_ORIGINS || '*').split(',').map((s) => s.trim());
-  const allowOrigin = allowed.includes('*') ? '*' : (allowed.includes(origin) ? origin : allowed[0]);
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Mockingbird-Lang, X-Mockingbird-User, X-SpeakIt-Lang'
-  };
-}
+export const config = { api: { bodyParser: false } };
 
 async function readRawBody(req) {
   const chunks = [];
@@ -64,11 +56,7 @@ async function deepgram(apiKey, audio, contentType, lang) {
 }
 
 export default async function handler(req, res) {
-  const headers = corsHeaders(req.headers.origin || '');
-  for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
-
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (preflight(req, res)) return;
 
   const contentType = req.headers['content-type'] || 'audio/webm';
   const lang = req.headers['x-mockingbird-lang'] || req.headers['x-speakit-lang'] || '';
