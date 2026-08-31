@@ -45,7 +45,7 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
 
-  var VERSION = '3.1.0';
+  var VERSION = '4.0.0';
   var DICT_STORAGE_KEY = 'mockingbird.dictionary';
   var LEGACY_DICT_KEY = 'speakit.dictionary';
 
@@ -61,9 +61,20 @@
     formatEndpoint: null,
     // Server transcription endpoint: POST audio/webm body -> {text}.
     transcribeEndpoint: null,
-    // Voice-actions endpoint: POST {text, actions, appContext, dictionary, user}
-    //   -> {kind:'actions', actions:[{name, input}, ...]} | {kind:'dictation', text}.
+    // Voice-actions endpoint: POST {text, actions, connectors, appContext, dictionary, user}
+    //   -> {kind:'actions', actions:[{name, input, connector, execute}, ...]} | {kind:'dictation', text}.
     actionsEndpoint: null,
+    // Action-execution endpoint (api/act.js). Needed only when connectors are
+    // enabled: actions Mockingbird owns are run here, in-app actions still go
+    // to your onAction handler.
+    actEndpoint: null,
+    // Connectors this user can act on, e.g. ['followupboss'] — the deployment
+    // supplies the credentials from its own env. NEVER put an API key in
+    // browser code; see docs/CONNECTORS.md.
+    connectors: [],
+    // Show what a connector action will do and wait for Enter before running
+    // it. In-app actions (your own handler) are never gated by this.
+    confirmActions: true,
     // Registered actions: [{name, description, input_schema}]. Usually set via
     // Mockingbird.registerActions(actions, handler).
     actions: [],
@@ -74,6 +85,9 @@
     appContext: '',
     // Who is speaking — flows through to the event log (Supabase) for analytics.
     userId: null,
+    // Let the deployment build a voice profile from these dictations
+    // (see docs/LEARNING.md). false = handle each utterance and forget it.
+    learn: true,
     // Personal dictionary: names, neighborhoods, jargon the recognizer gets wrong.
     // Merged with words learned via Mockingbird.learn(), persisted in localStorage.
     dictionary: [],
@@ -287,7 +301,12 @@
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
         'opacity:0;transform:translateX(12px) scale(.95);pointer-events:none;' +
         'transition:opacity .28s ease,transform .34s cubic-bezier(.2,1.5,.4,1);}' +
-        '.mb-wrap.listening .mb-pill,.mb-wrap.polishing .mb-pill,.mb-wrap.done .mb-pill,.mb-wrap.error .mb-pill{opacity:1;transform:translateX(0) scale(1)}' +
+        '.mb-wrap.listening .mb-pill,.mb-wrap.polishing .mb-pill,.mb-wrap.done .mb-pill,.mb-wrap.error .mb-pill,.mb-wrap.confirm .mb-pill{opacity:1;transform:translateX(0) scale(1)}' +
+        '.mb-wrap.confirm .mb-btn{background:linear-gradient(180deg,#3d6fd4,#2f58ad)}' +
+        '.mb-wrap.confirm .mb-pill{white-space:normal;max-width:420px;pointer-events:auto}' +
+        '.mb-confirm-text{font-weight:600;text-transform:capitalize}' +
+        '.mb-confirm-keys{margin-top:5px;opacity:.6;font-weight:400;font-size:12px}' +
+        '.mb-key{padding:1px 5px;border-radius:5px;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}' +
         '.mb-pill .mb-hint{opacity:.55;font-weight:400}' +
         '.mb-pill .mb-ok{color:#7ee2a8}' +
         '.mb-bars{display:inline-flex;gap:2.5px;align-items:center;height:16px;margin-right:9px;vertical-align:-3px}' +
@@ -436,6 +455,7 @@
     cancel: function () {
       this.toggled = false;
       this._cancelled = true;
+      if (this._pendingConfirm) { this._pendingConfirm(false); return; }
       if (this.recognition) { try { this.recognition.abort(); } catch (e) {} }
       if (this.mediaRecorder && this.mediaRecorder.state === 'recording') this.mediaRecorder.stop();
       this._setState('idle');
@@ -538,7 +558,7 @@
     _finish: function (raw) {
       raw = (raw || '').trim();
       if (!raw) { this._setState('idle'); return; }
-      if (this.opts.actionsEndpoint && this.opts.actions.length) {
+      if (this.opts.actionsEndpoint && (this.opts.actions.length || this.opts.connectors.length)) {
         this._resolveAction(raw);
       } else if (this.opts.formatEndpoint) {
         this._polish(raw);
@@ -558,9 +578,11 @@
         body: JSON.stringify({
           text: raw,
           actions: this.opts.actions,
+          connectors: this.opts.connectors,
           appContext: this.opts.appContext || document.title,
           dictionary: this._dictionary(),
-          user: this.opts.userId
+          user: this.opts.userId,
+          learn: this.opts.learn !== false
         })
       })
         .then(function (r) { if (!r.ok) throw new Error('actions ' + r.status); return r.json(); })
@@ -568,27 +590,108 @@
           var list = null;
           if (data && data.kind === 'actions' && Array.isArray(data.actions)) list = data.actions;
           else if (data && data.kind === 'action' && data.name) list = [{ name: data.name, input: data.input }];
-          if (list && list.length) {
-            list.forEach(function (a) {
-              if (a && a.name && typeof self.opts.onAction === 'function') {
-                self.opts.onAction(a.name, a.input || {});
-              }
-            });
-            var label = list.length === 1
-              ? list[0].name.replace(/_/g, ' ')
-              : list.length + ' items added';
-            self._setState('done', label);
-          } else if (data && data.kind === 'dictation' && data.text) {
-            self._insert(String(data.text).trim());
-          } else {
-            self._insert(raw);
-          }
+          if (list && list.length) return self._dispatch(list, raw);
+          if (data && data.kind === 'dictation' && data.text) self._insert(String(data.text).trim());
+          else self._insert(raw);
         })
         .catch(function () {
           // Endpoint down — degrade to plain dictation so nothing is lost.
           if (self.opts.formatEndpoint) self._polish(raw);
           else self._insert(raw);
         });
+    },
+
+    // In-app actions go straight to the app's handler — it owns its own UI and
+    // its own undo. Actions Mockingbird would execute against someone's real
+    // CRM are shown first and wait for Enter.
+    _dispatch: function (list, raw) {
+      var self = this;
+      var mine = [];
+      var theirs = [];
+      list.forEach(function (a) {
+        if (a && a.name) (a.execute && self.opts.actEndpoint ? mine : theirs).push(a);
+      });
+
+      theirs.forEach(function (a) {
+        if (typeof self.opts.onAction === 'function') self.opts.onAction(a.name, a.input || {});
+      });
+
+      if (!mine.length) {
+        this._setState('done', theirs.length === 1
+          ? theirs[0].name.replace(/_/g, ' ')
+          : theirs.length + ' items added');
+        return;
+      }
+      if (this.opts.confirmActions === false) return this._runActions(mine, raw);
+      this._confirm(mine, raw);
+    },
+
+    // The confirmation pill: what is about to happen, and the keys to accept or
+    // throw it away. Deliberately the same shape as the desktop app's card.
+    _confirm: function (actions, raw) {
+      var self = this;
+      var summary = actions.map(function (a) {
+        var label = a.name.replace(/^fub_/, '').replace(/_/g, ' ');
+        var subject = a.input && (a.input.name || a.input.person || a.input.title || a.input.query);
+        return label + (subject ? ' · ' + subject : '');
+      }).join(' + ');
+
+      this._setState('confirm', summary);
+      if (this.ui) {
+        this.ui.pill.innerHTML = '';
+        var text = document.createElement('div');
+        text.className = 'mb-confirm-text';
+        text.textContent = summary;
+        var keys = document.createElement('div');
+        keys.className = 'mb-confirm-keys';
+        keys.innerHTML = '<span class="mb-key">↵</span> run &nbsp;<span class="mb-key">esc</span> cancel';
+        this.ui.pill.appendChild(text);
+        this.ui.pill.appendChild(keys);
+      }
+
+      var resolve = function (accept) {
+        document.removeEventListener('keydown', onKey, true);
+        if (self.ui) self.ui.btn.removeEventListener('click', onClick);
+        self._pendingConfirm = null;
+        if (accept) self._runActions(actions, raw);
+        else self._setState('idle');
+      };
+      var onKey = function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); resolve(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); resolve(false); }
+      };
+      var onClick = function () { resolve(true); };
+      this._pendingConfirm = resolve;
+      document.addEventListener('keydown', onKey, true);
+      if (this.ui) this.ui.btn.addEventListener('click', onClick);
+    },
+
+    _runActions: function (actions, raw) {
+      var self = this;
+      this._setState('polishing', 'Doing it…');
+      fetch(this.opts.actEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actions: actions.map(function (a) { return { name: a.name, input: a.input }; }),
+          connectors: this.opts.connectors,
+          user: this.opts.userId,
+          appContext: this.opts.appContext || document.title,
+          transcript: raw
+        })
+      })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (response) {
+          var results = (response.data && response.data.results) || [];
+          var good = results.filter(function (r) { return r.ok; });
+          var bad = results.filter(function (r) { return !r.ok; });
+          // A lookup answers by typing the answer where the cursor is.
+          var answer = good.map(function (r) { return r.text; }).filter(Boolean).join('\n');
+          if (answer) self._insert(answer);
+          if (bad.length && !good.length) self._fail(bad[0].error || 'That did not go through');
+          else self._setState('done', good.map(function (r) { return r.summary; }).filter(Boolean).join(' · ') || 'Done');
+        })
+        .catch(function (err) { self._fail(err.message || 'Could not reach the action service'); });
     },
 
     // Claude cleanup. With liveInsert, raw words land instantly and get swapped
@@ -748,6 +851,21 @@
       return api;
     },
 
+    /**
+     * Enable a connector for this page: Mockingbird itself can then create
+     * records in that system from what the user says.
+     *
+     *   Mockingbird.connect('followupboss')   // credentials come from the deployment env
+     *
+     * Pass a string, never a key — anything you put here is visible to anyone
+     * with the page open. See docs/CONNECTORS.md.
+     */
+    connect: function (spec) {
+      if (!instance) api.init({});
+      instance.opts.connectors = (instance.opts.connectors || []).concat(spec || []);
+      return api;
+    },
+
     /** Teach Mockingbird a word: agent names, neighborhoods, jargon. */
     learn: function (word) {
       word = String(word || '').trim();
@@ -796,6 +914,10 @@
         if (d.formatEndpoint) opts.formatEndpoint = d.formatEndpoint;
         if (d.transcribeEndpoint) opts.transcribeEndpoint = d.transcribeEndpoint;
         if (d.actionsEndpoint) opts.actionsEndpoint = d.actionsEndpoint;
+        if (d.actEndpoint) opts.actEndpoint = d.actEndpoint;
+        if (d.connectors) opts.connectors = d.connectors.split(',').map(function (c) { return c.trim(); }).filter(Boolean);
+        if (d.confirmActions === 'false') opts.confirmActions = false;
+        if (d.learn === 'false') opts.learn = false;
         if (d.hotkey) opts.hotkey = d.hotkey;
         if (d.lang) opts.lang = d.lang;
         if (d.engine) opts.engine = d.engine;

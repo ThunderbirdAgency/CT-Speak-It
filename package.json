@@ -9,7 +9,8 @@
     "db"
   ],
   "scripts": {
-    "demo": "npx serve ."
+    "demo": "npx serve .",
+    "test": "node test/server.mjs && node desktop/tools/smoke.js && node test/widget.cjs"
   },
   "keywords": [
     "dictation",
