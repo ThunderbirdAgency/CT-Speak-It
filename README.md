@@ -1,80 +1,173 @@
 # Mockingbird 🐦
 
-**Thunderbird's voice layer — one deployment, voice in every build.** One script tag gives any web app two superpowers:
-
-1. **Dictation** — hold a hotkey, speak, release: clean, AI-polished text lands exactly where your cursor is.
-2. **Voice actions** — register your app's actions and spoken commands become structured objects: say *"open house at 123 Main Street this Saturday at 2pm"* and `{name: "create_open_house", input: {address: "123 Main Street", date: "2026-07-11", time: "14:00"}}` is delivered to your handler — the card pops onto the dashboard.
+**Talk instead of type — anywhere on your machine — and tell your systems what
+to do.**
 
 ```
- hold Ctrl+Space ─▶ 🎤 speak ─▶ Whisper-grade transcription ─▶ Claude decides:
-                                                               ├─ command?  → structured action → your handler
-                                                               └─ dictation → polished text → your cursor
+Ctrl/Cmd+Shift+Space ─▶ 🎤 speak ─▶ polished text lands where your cursor is
+                                     (email, Word, Slack, any CRM field, anything)
+
+Ctrl/Cmd+Shift+K ─────▶ 🎤 speak ─▶ "Create person · Maria Lopez · Follow Up Boss"
+                                     ⏎ ─▶ done. In the real system.
 ```
 
-## Adding it to an app
+Dictation apps stop at typing. Mockingbird also *acts*: describe what you want
+and it creates the contact, logs the call, books the showing, sets the
+follow-up — in Follow Up Boss, in our own builds, in anything with an API.
+Nothing is written until you see what it's about to do and press Enter.
 
-Tell Claude: **"add the mockingbird — follow docs/ADD-MOCKINGBIRD.md in the CT-Speak-It repo"** and it will wire the script tag, actions, and handler into any project. Manual steps below.
+It ships two ways, on one deployment:
 
-## Quick start
+- **Desktop app** (Mac/Windows) — works in every application on the machine.
+- **Web widget** — one script tag gives any of our builds dictation *and*
+  in-app voice actions.
 
-**Dictation only (zero backend):**
+New here? **[docs/INSTALL.md](docs/INSTALL.md)** — 20 minutes to set up, three
+steps for the people who use it.
+
+## What it's like to use
+
+You've just wrapped an open house. Three buyers came through and there's a
+follow-up forming in your head. You hold a key and talk:
+
+> "Just wrapped the open house at 123 Main — three people came through: John
+> Doe 555-0142, Maria Lopez, maria at gmail dot com, and Sam Chen. Follow up
+> with all of them Monday."
+
+Three contacts, the open house, and Monday's tasks — one Enter, before you're
+out of the driveway. Say "um" and it disappears. Correct yourself mid-sentence
+— "2 o'clock, no wait, 3" — and only the 3 survives. Spell an email out loud
+and it assembles it. It learns your neighbourhoods and your clients' names, and
+it gets better every week you use it.
+
+## How it fits together
+
+```
+                     ┌──────────────────┐
+  desktop app  ──┐   │  /api/transcribe │  Whisper-grade speech-to-text
+  web widget   ──┼──▶│  /api/format     │  Claude polish, in your voice
+  any client   ──┘   │  /api/actions    │  command or dictation? which fields?
+                     │  /api/act        │  the only thing that writes anywhere
+                     │  /api/profile    │  what it has learned about you
+                     └────────┬─────────┘
+                              ▼
+              Follow Up Boss · your products · your app's own handler
+```
+
+`/api/actions` decides, the client shows the card, `/api/act` executes. That
+split is the safety model: an agent should never discover that a sentence they
+half-said created something in their CRM.
+
+## Setup at a glance
+
+Deploy this repo (Vercel), set two keys, and you're running:
+
+| Env var | Enables |
+|---|---|
+| `ANTHROPIC_API_KEY` | polish + command understanding — **required** |
+| `GROQ_API_KEY` *(or `DEEPGRAM_API_KEY` / `OPENAI_API_KEY`)* | Whisper-grade transcription — **required** |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | event log + the voice profile ([LEARNING.md](docs/LEARNING.md)) |
+| `ALLOWED_ORIGINS` | CORS allowlist for the web widget |
+| `FOLLOWUPBOSS_API_KEY` | team-wide Follow Up Boss, no keys on laptops |
+| `CONNECTOR_ALLOWED_HOSTS` | restrict custom connectors to hosts you name |
+
+Full walkthrough: **[docs/INSTALL.md](docs/INSTALL.md)**.
+
+## Desktop app
+
+```bash
+cd desktop && npm install && npm start     # development
+cd desktop && npm run dist:mac             # → dist/Mockingbird-1.0.0.dmg
+```
+
+Menu bar / system tray, launches at login, two shortcuts, a settings window
+with connectors, history, and everything it has learned. Details:
+[desktop/README.md](desktop/README.md).
+
+## Web widget
+
+**Dictation only, zero backend:**
 
 ```html
 <script src="https://your-deployment/src/mockingbird.js"></script>
 ```
 
-**Full stack (one deployment serves ALL your products):** deploy this repo to Vercel, set the env vars below, then in every build:
+**Everything, one deployment for all your builds:**
 
 ```html
-<script src="https://mockingbird-thunderbird.vercel.app/src/mockingbird.js"
-        data-transcribe-endpoint="https://mockingbird-thunderbird.vercel.app/api/transcribe"
-        data-format-endpoint="https://mockingbird-thunderbird.vercel.app/api/format"
-        data-actions-endpoint="https://mockingbird-thunderbird.vercel.app/api/actions"></script>
+<script src="https://your-deployment/src/mockingbird.js"
+        data-transcribe-endpoint="https://your-deployment/api/transcribe"
+        data-format-endpoint="https://your-deployment/api/format"
+        data-actions-endpoint="https://your-deployment/api/actions"
+        data-act-endpoint="https://your-deployment/api/act"
+        data-connectors="followupboss"></script>
 ```
 
-| Env var | Enables | Required |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | AI cleanup + voice actions (Claude) | for `/api/format` and `/api/actions` |
-| `GROQ_API_KEY` *(or `DEEPGRAM_API_KEY` / `OPENAI_API_KEY`)* | Whisper-grade transcription | for `/api/transcribe` |
-| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Event log: every dictation & action recorded to `mockingbird_events` (see `db/schema.sql`) | optional |
-| `ALLOWED_ORIGINS` | CORS allowlist, e.g. `https://crm.you.com,https://apu.you.com` | optional (default `*`) |
+Adding it to an app: tell Claude **"add the mockingbird — follow
+docs/ADD-MOCKINGBIRD.md in the CT-Speak-It repo"**, or do it by hand from that
+file.
 
-## Voice actions — the CRM/dashboard feature
+### In-app voice actions
 
-In your app's JS, describe the things a user can create and hand over a handler:
+Describe what your app can do and hand over a handler. Your actions go straight
+to you — you own the UI and the undo — while connector actions are the ones
+Mockingbird runs itself:
 
 ```js
 Mockingbird.registerActions([
   {
     name: 'create_open_house',
-    description: 'Schedule an open house for a property',
+    description: 'Schedule an open house. Trigger on "open house", "showing".',
     input_schema: {
       type: 'object',
       properties: {
         address: { type: 'string' },
         date:    { type: 'string', description: 'ISO date' },
-        time:    { type: 'string', description: 'HH:MM 24h' },
-        host:    { type: 'string' },
-        notes:   { type: 'string' }
+        time:    { type: 'string', description: 'HH:MM 24h' }
       },
       required: ['address']
     }
   }
 ], (name, input) => {
-  // name === 'create_open_house', input is schema-shaped and date-resolved
-  api.createOpenHouse(input);      // your backend
-  dashboard.popCard(input);        // your UI
+  api.createOpenHouse(input);   // your backend
+  dashboard.popCard(input);     // your UI
 });
+
+Mockingbird.connect('followupboss');   // a name, never a key — pages are public
 ```
 
-Claude receives your schemas as tools, resolves relative dates ("this Saturday" → real ISO date), applies self-corrections ("2pm no wait 3" → `15:00`), assembles spoken emails ("maria at gmail dot com"), and puts stray remarks into `notes`. **One utterance can produce several actions** — "three people came through: John…, Maria…, Sam…" fires your handler three times with three contacts. Anything that *isn't* a command falls through to normal polished dictation — users never have to think about modes.
+One utterance can produce several actions — "three people came through: John…,
+Maria…, Sam…" fires your handler three times. Anything that isn't a command
+falls through to ordinary polished dictation, so nobody has to think about
+modes.
+
+## Connectors
+
+Follow Up Boss out of the box: contacts, notes, tasks, calls, appointments,
+stage changes, lookups. Your own products by describing their endpoints once —
+no code. **[docs/CONNECTORS.md](docs/CONNECTORS.md)**.
+
+## What it learns
+
+Mockingbird reads back a person's own dictations to write the way they write
+and spell their people's names right. That profile is visible to them in the
+app, erasable in one click, and switch-off-able entirely. What's kept, what
+isn't, and how to be straight with your team about it:
+**[docs/LEARNING.md](docs/LEARNING.md)**.
 
 ## Dictation quality
 
-- **Whisper-grade accuracy:** set `transcribeEndpoint` and audio is transcribed by `whisper-large-v3-turbo` (Groq), `nova-3` (Deepgram), or `whisper-1` (OpenAI) — whichever key you configure. Without it, the browser's built-in recognizer is used (Chrome/Edge/Safari).
-- **Feels instant:** with `liveInsert` (default on), your raw words appear the moment you release the key, then get seamlessly swapped for the Claude-polished version. If you kept typing meanwhile, the swap is skipped — your edits win.
-- **Personal dictionary:** `Mockingbird.learn('Poinciana')` teaches it your agents' names, neighborhoods, and jargon (persisted in localStorage, merged with the `dictionary` option, and fed to the AI to fix mishearings).
-- **Never loses words:** formatter down → raw transcript inserted; no field focused → text goes to the clipboard.
+- **Whisper-grade:** `whisper-large-v3-turbo` (Groq), `nova-3` (Deepgram), or
+  `whisper-1` (OpenAI) — whichever key is set. Without one, the browser's own
+  recognizer is used in web apps.
+- **Feels instant:** with `liveInsert`, raw words appear the moment you finish
+  and are swapped for the polished version a beat later. Kept typing? The swap
+  is skipped — your edits win.
+- **Personal dictionary:** `Mockingbird.learn('Poinciana')`, or the words field
+  in desktop Settings.
+- **Never loses words:** formatter down → raw transcript. Router down → plain
+  dictation. No field focused → clipboard. Every failure still ends with your
+  words somewhere.
 
 ## Configuration
 
@@ -82,66 +175,69 @@ Data attributes on the script tag, or `Mockingbird.init({...})`:
 
 | Option | Attribute | Default | Description |
 |---|---|---|---|
-| `hotkey` | `data-hotkey` | `Ctrl+Space` | Hold-to-talk combo (`Alt+D`, `Ctrl+Shift+M`, …) |
-| `transcribeEndpoint` | `data-transcribe-endpoint` | — | Whisper-grade transcription (`api/transcribe.js`) |
-| `formatEndpoint` | `data-format-endpoint` | — | AI cleanup (`api/format.js`) |
-| `actionsEndpoint` | `data-actions-endpoint` | — | Voice actions (`api/actions.js`) |
-| `engine` | `data-engine` | `auto` | `auto` prefers the server engine when configured |
-| `lang` | `data-lang` | `en-US` | Recognition language |
+| `hotkey` | `data-hotkey` | `Ctrl+Space` | Hold-to-talk combo |
+| `transcribeEndpoint` | `data-transcribe-endpoint` | — | Whisper-grade transcription |
+| `formatEndpoint` | `data-format-endpoint` | — | Claude cleanup |
+| `actionsEndpoint` | `data-actions-endpoint` | — | Command vs dictation routing |
+| `actEndpoint` | `data-act-endpoint` | — | Executes connector actions |
+| `connectors` | `data-connectors` | `[]` | e.g. `followupboss` (names, never keys) |
+| `confirmActions` | `data-confirm-actions="false"` | `true` | Ask before touching a real system |
+| `learn` | `data-learn="false"` | `true` | Contribute to the voice profile |
 | `tone` | `data-tone` | `clean` | `clean` \| `formal` \| `casual` \| `code-comment` |
-| `appContext` | `data-app-context` | page title | Tells the AI what app it's typing into |
-| `dictionary` | — | `[]` | Custom vocabulary (merged with learned words) |
-| `liveInsert` | `data-live-insert="false"` | `true` | Instant raw insert, swap in polish when ready |
+| `appContext` | `data-app-context` | page title | Tells the AI what it's typing into |
+| `userId` | `data-user-id` | — | Who's speaking (log + profile) |
+| `lang` | `data-lang` | `en-US` | Recognition language |
+| `dictionary` | — | `[]` | Custom vocabulary |
+| `liveInsert` | `data-live-insert="false"` | `true` | Instant raw insert, swap in polish |
 | `position` | `data-position` | `bottom-right` | Mic button corner |
-| `button` | `data-button="false"` | `true` | Hide the floating button (hotkey-only) |
-| — | `data-manual="true"` | — | Skip auto-init; call `Mockingbird.init()` yourself |
+| `button` | `data-button="false"` | `true` | Hide the floating button |
+| — | `data-manual="true"` | — | Skip auto-init |
 
 ### JavaScript API
 
 ```js
-Mockingbird.init(options)                       // (re)initialize
-Mockingbird.registerActions(actions, handler)   // voice commands for this app
-Mockingbird.learn('Poinciana')                  // teach a word (persisted)
-Mockingbird.forget('Poinciana')
-Mockingbird.dictionary                          // merged vocabulary
-Mockingbird.simulate('open house at 123 ...')   // run text through the full pipeline (testing/demo)
+Mockingbird.init(options)
+Mockingbird.registerActions(actions, handler)   // this app's own actions
+Mockingbird.connect('followupboss')             // systems Mockingbird acts on
+Mockingbird.learn('Poinciana') / forget(word) / dictionary
+Mockingbird.simulate('open house at 123 ...')   // run text through the pipeline, no mic
 Mockingbird.start() / stop() / cancel() / destroy()
-Mockingbird.state                               // idle | listening | polishing | done | error
+Mockingbird.state                               // idle | listening | polishing | confirm | done | error
 ```
 
-Callbacks: `onAction(name, input)`, `onTranscript(text)`, `onStateChange(state)`, `onError(err)`.
+Callbacks: `onAction(name, input)`, `onTranscript(text)`, `onStateChange(state)`,
+`onError(err)`.
 
-## Demos
+## Demos and tests
 
 ```bash
 npx serve .
-# http://localhost:3000/demo/        — dictation into inputs/textareas/rich text
-# http://localhost:3000/demo/crm.html — CRM voice actions: speak, cards pop out
+# /demo/          dictation into inputs, textareas, rich text
+# /demo/crm.html  voice actions: speak, cards pop out
+
+npm test          # connectors + desktop main process + widget in a real browser
 ```
 
-The CRM demo includes an offline mock parser so cards pop even before the API is deployed; deploy `/api/actions` for the real Claude-powered extraction. Mic access requires HTTPS or localhost. For end-to-end local testing with the APIs, use `vercel dev`.
+Mic access needs HTTPS or localhost. For the APIs locally, `vercel dev`.
 
 ## Repo layout
 
 ```
-src/mockingbird.js      the widget — embed in any build
-api/transcribe.js   Whisper-grade transcription proxy (Groq/Deepgram/OpenAI)
-api/actions.js      voice → structured actions (Claude)
-api/format.js       transcript cleanup (Claude)
-api/_lib/log.js     optional Supabase event logging
-db/schema.sql       mockingbird_events table (run once in Supabase)
-docs/ADD-MOCKINGBIRD.md  paste-to-Claude integration instructions
-demo/index.html     dictation playground
-demo/crm.html       CRM voice-actions demo
+src/mockingbird.js              the widget — embed in any build
+api/transcribe.js               speech → text (Groq/Deepgram/OpenAI)
+api/format.js                   transcript → polished text (Claude)
+api/actions.js                  command or dictation? which fields?
+api/act.js                      executes confirmed actions — the only writer
+api/profile.js                  read / rebuild / erase a voice profile
+api/tools.js                    what this deployment can connect to
+api/_lib/connectors/            followupboss.js · custom.js · registry
+api/_lib/profile.js             distills a person's profile from their events
+db/schema.sql                   events, profiles, usage view
+desktop/                        the Mac/Windows app
+demo/                           dictation playground · CRM voice actions
+test/                           server + browser tests
+docs/INSTALL.md                 set it up, roll it out
+docs/CONNECTORS.md              make it do things
+docs/LEARNING.md                what it remembers, and the rules
+docs/ADD-MOCKINGBIRD.md         paste-to-Claude integration instructions
 ```
-
-## Data & analytics
-
-Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` on the deployment (and run `db/schema.sql` once) and every dictation and voice action across all apps is logged to `mockingbird_events`: who spoke (`userId`), in which app, the raw transcript, the polished output or matched actions, and processing time. Browsers never touch the table directly — only the API endpoints write, with the service key. Raw audio is deliberately not stored (transcripts give you the analytics without the storage/privacy weight); flip that later by adding a storage upload in `api/transcribe.js` if you ever need voice recordings.
-
-Things you can build on this table for free: per-agent usage dashboards, a "recently dictated" activity feed, mishearing analysis to auto-grow the dictionary, and an audit trail for every voice-created CRM record.
-
-## Notes
-
-- Everything degrades gracefully: actions endpoint down → polished dictation; formatter down → raw transcript; no mic permission → clear error state.
-- This covers everything inside your web apps. System-wide dictation into native apps (desktop Wispr Flow's turf) would be a small desktop wrapper (Tauri/Electron global hotkey) reusing these same endpoints — ask if you want it.
