@@ -12,6 +12,8 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { logEvent } from './_lib/log.js';
+import { preflight } from './_lib/http.js';
+import { profileContext, maybeRefresh } from './_lib/profile.js';
 
 const client = new Anthropic();
 
@@ -32,26 +34,10 @@ Rules:
 - Preserve the speaker's meaning, wording, and language exactly otherwise. Do not summarize, expand, answer questions in the text, or add anything that was not said.
 - Output ONLY the cleaned text — no preamble, no quotes around it, no explanation.`;
 
-// CORS is open by default so the same deployment can serve all of your builds.
-// Lock it down by setting ALLOWED_ORIGINS="https://app1.com,https://app2.com".
-function corsHeaders(origin) {
-  const allowed = (process.env.ALLOWED_ORIGINS || '*').split(',').map((s) => s.trim());
-  const allowOrigin = allowed.includes('*') ? '*' : (allowed.includes(origin) ? origin : allowed[0]);
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  };
-}
-
 export default async function handler(req, res) {
-  const headers = corsHeaders(req.headers.origin || '');
-  for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+  if (preflight(req, res)) return;
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-
-  const { text, tone = 'clean', appContext = '', dictionary = [], user = null } = req.body || {};
+  const { text, tone = 'clean', appContext = '', dictionary = [], user = null, learn = true } = req.body || {};
   const startedAt = Date.now();
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'Missing "text"' });
@@ -59,6 +45,10 @@ export default async function handler(req, res) {
   if (text.length > 20000) {
     return res.status(413).json({ error: 'Transcript too long' });
   }
+
+  // The speaker's own profile — how they write, the names they use — so the
+  // polished text comes back sounding like them rather than like an AI.
+  const { block: profileBlock } = await profileContext(user, learn);
 
   try {
     const response = await client.messages.create({
@@ -74,6 +64,7 @@ export default async function handler(req, res) {
             (Array.isArray(dictionary) && dictionary.length
               ? `Names/terms the speaker uses (fix mishearings toward these): ${dictionary.slice(0, 200).join(', ')}\n`
               : '') +
+            profileBlock +
             `\nRaw transcript:\n${text}`
         }
       ]
@@ -96,6 +87,7 @@ export default async function handler(req, res) {
       duration_ms: Date.now() - startedAt,
       meta: { model: response.model, tone, via: 'format' }
     });
+    maybeRefresh(user, learn);
     return res.status(200).json({ text: cleaned || text });
   } catch (err) {
     console.error('mockingbird format error:', err);
