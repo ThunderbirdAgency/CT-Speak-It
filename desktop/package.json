@@ -1,11 +1,13 @@
 {
   "name": "mockingbird-desktop",
   "productName": "Mockingbird",
-  "version": "0.1.0",
-  "description": "Mockingbird desktop — system-wide voice dictation for Mac and Windows, powered by your Mockingbird deployment.",
+  "version": "1.0.0",
+  "description": "Mockingbird — talk instead of type, anywhere on your machine, and tell your CRM what to do.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node tools/smoke.js",
+    "icons": "node tools/make-icons.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist": "electron-builder --mac --win"
@@ -21,17 +23,37 @@
     "files": [
       "main.js",
       "preload.js",
-      "overlay.html"
+      "overlay.html",
+      "settings.html",
+      "assets/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dmg",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "icon": "assets/icon.png",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Mockingbird uses the microphone for voice dictation."
+        "NSMicrophoneUsageDescription": "Mockingbird uses the microphone so you can dictate instead of typing.",
+        "NSAppleEventsUsageDescription": "Mockingbird sends a paste keystroke so dictated text lands where your cursor is.",
+        "LSUIElement": true
       }
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Utility"
     }
   }
 }

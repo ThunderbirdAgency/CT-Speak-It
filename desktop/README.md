@@ -1,29 +1,34 @@
-# Mockingbird Desktop 🐦 (beta)
+# Mockingbird Desktop 🐦
 
-System-wide dictation for **Mac and Windows**: press the hotkey in *any*
-application — Outlook, Word, a browser, anything — speak, press it again, and
-the Claude-polished text is pasted at your cursor. Uses the same Mockingbird
-deployment (and the same Whisper-grade transcription, formatting, and event
-log) as the web widget.
-
-> **Status: beta scaffold.** Built and syntax-verified, but global hotkeys and
-> paste simulation can only be truly tested on a real Mac/PC — expect to run it
-> once, grant two permissions, and report anything odd.
-> Any Claude Code session can iterate on it: "fix X in desktop/".
-
-## How it works
+Talk instead of type — **anywhere on your machine** — and tell your systems what
+to do.
 
 ```
-hotkey (Ctrl/Cmd+Shift+Space) ─▶ overlay pill appears (never steals focus)
-   ─▶ speak ─▶ hotkey again ─▶ /api/transcribe ─▶ /api/format
-   ─▶ text placed on clipboard ─▶ paste keystroke simulated into the front app
+Ctrl/Cmd+Shift+Space   speak → polished text pasted where your cursor is
+                       (Outlook, Word, Gmail, Slack, any CRM field, anything)
+
+Ctrl/Cmd+Shift+K       speak an instruction → Mockingbird shows what it will do
+                       → press ⏎ → it happens in Follow Up Boss / your CRM
 ```
 
-No native modules: paste is simulated with `osascript` (Mac) / PowerShell
-`SendKeys` (Windows) / `xdotool` (Linux, if installed). If simulation is
-blocked, the text is on the clipboard and a notification says to press paste.
+Same deployment, same accuracy, same personal dictionary as the web widget —
+this is just the copy that follows you into every other application.
 
-## Run it (development)
+## Install
+
+**From an installer** (what agents get):
+
+1. Download `Mockingbird-1.0.0.dmg` (Mac) or `Mockingbird Setup 1.0.0.exe` (Windows).
+2. Open it, drag to Applications / click through the installer.
+3. Mockingbird opens its setup window. Paste the deployment URL your team gave
+   you, type your name, hit **Save**. That's the whole setup.
+4. Press **Ctrl/Cmd+Shift+Space** in any app and talk.
+
+First dictation asks for the microphone. On a Mac, also switch Mockingbird on
+under **System Settings → Privacy & Security → Accessibility** so text pastes
+itself — until you do, it waits on the clipboard and you press Cmd+V.
+
+**From source** (development):
 
 ```bash
 cd desktop
@@ -31,47 +36,86 @@ npm install
 npm start
 ```
 
-First launch opens `config.json` — set your deployment:
+## Using it
 
-```json
-{
-  "baseUrl": "https://your-mockingbird.vercel.app",
-  "hotkey": "CommandOrControl+Shift+Space",
-  "tone": "clean",
-  "lang": "en-US",
-  "userId": "erik"
-}
-```
+**Dictating.** Put your cursor where the words should go, press the shortcut,
+talk, press it again. The pill in the corner shows the level while you speak
+and the text lands a moment later — filler words gone, self-corrections
+applied, spoken punctuation turned into real punctuation. Escape cancels.
+Whatever was on your clipboard is put back afterwards.
 
-Tray icon → "Reload settings" after editing.
+**Commanding.** Press the command shortcut and say what you want done:
 
-## Permissions
+> "Add Maria Lopez, 555-0142, from the open house at 123 Main, and remind me to
+> call her Monday morning."
 
-- **Mac:** first dictation prompts for **Microphone**; auto-paste needs
-  **System Settings → Privacy & Security → Accessibility → allow Mockingbird**
-  (until granted, text lands on the clipboard and you press Cmd+V).
-- **Windows:** microphone prompt only.
+Mockingbird shows a card with exactly what it is about to do — the action, the
+system, every field it filled in — and waits. **Enter** runs it, **Escape**
+throws it away. Two things in one sentence become two cards and one Enter.
 
-## Build installers
+Questions work too: *"what's Maria Lopez's number"* pastes the answer where
+your cursor is.
+
+With **Notice commands while dictating** on (the default), you don't have to
+remember which shortcut you pressed: say something that is plainly an
+instruction and Mockingbird offers to run it instead of typing it. Anything
+ambiguous is treated as dictation — words in the wrong email are a nuisance, a
+record created by accident is worse.
+
+## Connecting your systems
+
+Settings → **Connectors**.
+
+- **Follow Up Boss** — paste an API key (FUB → Admin → API). You get contacts,
+  notes, tasks, calls, appointments, stage changes and lookups by voice.
+- **Your own product** — describe its endpoints once and they become things you
+  can say. See `docs/CONNECTORS.md` in this repo.
+
+Keys are stored in the app's own config file on your machine and travel with
+each request to your deployment. Mockingbird's server never stores them.
+
+## What it learns
+
+Settings → **What it's learned** shows the profile Mockingbird has built from
+your own dictations: how you write, the phrases you use, the names it now
+spells correctly, how you work. That is what makes the text come out sounding
+like you rather than like an AI. It is readable and erasable on that page, and
+the whole thing can be switched off. Details: `docs/LEARNING.md`.
+
+## Building installers
 
 ```bash
 cd desktop
 npm install
-npm run dist:mac   # → dist/Mockingbird-x.y.z.dmg   (run on a Mac)
-npm run dist:win   # → dist/Mockingbird Setup x.y.z.exe   (run on Windows, or a Mac with wine)
+npm run icons      # only after editing tools/make-icons.js
+npm run dist:mac   # → dist/Mockingbird-1.0.0.dmg     (run on a Mac)
+npm run dist:win   # → dist/Mockingbird Setup 1.0.0.exe (run on Windows)
 ```
 
-Unsigned builds are fine for internal use: Mac users right-click → Open the
-first time; Windows users click through SmartScreen. For public distribution
-add code signing (Apple Developer ID / Windows cert) to the `build` section —
-worth doing before the agent giveaway.
+Unsigned builds are fine internally: Mac users right-click → Open the first
+time, Windows users click through SmartScreen. Before handing this to a wider
+group of agents, add code signing (Apple Developer ID / Windows cert) — an
+unsigned app that asks for Accessibility permission is a hard sell.
+
+## Testing without a screen
+
+```bash
+npm test
+```
+
+Stubs Electron and a deployment, then drives the real main process through the
+paths that matter: hotkey → speak → confirmation card → Enter → action → history,
+plus the ones that must never lose words (router down, formatter down).
 
 ## Notes
 
-- The hotkey is a **toggle** (press to start, press to finish) — global
-  hold-to-talk isn't reliably detectable across apps, and toggle is what
+- The hotkeys are **toggles** (press to start, press to finish). Global
+  hold-to-talk isn't reliably detectable across applications, and toggle is what
   desktop dictation tools ship.
-- Voice **actions** are a web-app feature (they need a dashboard to act on);
-  desktop is pure dictation by design.
-- Replace the placeholder tray icon (`TRAY_ICON_B64` in `main.js`) with real
-  icon assets before giving this to agents.
+- Mockingbird sits in the menu bar / system tray with no dock or taskbar entry.
+  Click the icon to dictate; right-click for the menu.
+- **Auto-finish on silence** is off by default — set it in the config file
+  (`autoStopSeconds`) if you'd rather it end the recording for you.
+- Web apps that embed the widget get the same actions plus their own in-app ones;
+  the desktop app only runs connector actions, since there is no app here to
+  hand an in-app action to.
