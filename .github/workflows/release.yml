@@ -1,0 +1,82 @@
+# Builds the Mac and Windows installers and attaches them to a GitHub Release.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Two runners because a .dmg can only be built on macOS and an .exe installer on
+# Windows — this is what saves you from needing both machines on your desk.
+#
+# Builds are UNSIGNED. Fine internally (Mac: right-click → Open the first time;
+# Windows: click through SmartScreen), but sign before a wide rollout — an
+# unsigned app that asks for Accessibility permission is a hard sell. To sign,
+# add the certificate secrets electron-builder expects (CSC_LINK / CSC_KEY_PASSWORD
+# on macOS, WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD on Windows) and drop the
+# CSC_IDENTITY_AUTO_DISCOVERY line below.
+name: Release desktop installers
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.0.0)'
+        required: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: dist:mac
+            pattern: desktop/dist/*.dmg
+          - os: windows-latest
+            build: dist:win
+            pattern: desktop/dist/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # Keep the installer filename and the tag in step, so a downloaded file
+      # says which release it came from.
+      - name: Set version from the tag
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+        working-directory: desktop
+
+      - name: Install
+        run: npm ci
+        working-directory: desktop
+
+      - name: Build installer
+        run: npm run ${{ matrix.build }}
+        working-directory: desktop
+        env:
+          # Don't hunt for a signing identity that isn't there.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mockingbird-${{ matrix.os }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+
+      # Uses the token GitHub already gives the job — no third-party action,
+      # nothing to rotate.
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: gh release upload "$GITHUB_REF_NAME" ${{ matrix.pattern }} --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

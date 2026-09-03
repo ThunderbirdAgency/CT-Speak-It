@@ -12,12 +12,16 @@ import { preflight } from './_lib/http.js';
 import { availableConnectors, toolsFor } from './_lib/connectors/index.js';
 
 export default async function handler(req, res) {
-  if (preflight(req, res, 'GET, POST, OPTIONS')) return;
+  // The GET health check answers without a key: a client has to be able to ask
+  // "is this deployment set up?" before it has been handed one. It reports
+  // which variables are set, never their values.
+  if (preflight(req, res, 'GET, POST, OPTIONS', { open: req.method === 'GET' })) return;
 
   if (req.method === 'GET') {
     return res.status(200).json({
       connectors: availableConnectors(),
       // Handy for the desktop app's "is my deployment set up?" check.
+      requiresKey: Boolean(process.env.MOCKINGBIRD_ACCESS_KEY),
       configured: {
         transcription: Boolean(process.env.GROQ_API_KEY || process.env.DEEPGRAM_API_KEY || process.env.OPENAI_API_KEY),
         ai: Boolean(process.env.ANTHROPIC_API_KEY),

@@ -151,6 +151,11 @@
       </div>
 
       <div class="field">
+        <label class="lab" for="accessKey">Access key <span style="opacity:.6">— only if your team set one</span></label>
+        <input type="password" id="accessKey" placeholder="leave empty unless you were given one" spellcheck="false">
+      </div>
+
+      <div class="field">
         <label class="lab" for="userId">2 · Who's speaking</label>
         <input type="text" id="userId" placeholder="erik" spellcheck="false">
         <div class="hint">Used to keep your dictionary and your writing style separate from everyone else's.</div>
@@ -361,7 +366,7 @@
 
   // ----------------------------------------------------------------- setup
 
-  var SETUP_FIELDS = ['baseUrl', 'userId', 'dictationHotkey', 'commandHotkey', 'tone', 'lang'];
+  var SETUP_FIELDS = ['baseUrl', 'accessKey', 'userId', 'dictationHotkey', 'commandHotkey', 'tone', 'lang'];
   var SETUP_CHECKS = ['autoPaste', 'smartCommands', 'confirmActions', 'launchAtLogin'];
 
   function fillSetup() {
@@ -417,9 +422,19 @@
     var missing = [];
     if (!result.configured.transcription) missing.push('speech-to-text (GROQ_API_KEY)');
     if (!result.configured.ai) missing.push('Claude (ANTHROPIC_API_KEY)');
-    note($('checkResult'), missing.length ? 'bad' : 'ok', missing.length
-      ? 'Reached the deployment, but it is missing: ' + missing.join(', ') + '. Whoever deployed it needs to add those environment variables.'
-      : 'Deployment is healthy' + (result.configured.log ? ' (with the shared event log on).' : '.'));
+    if (missing.length) {
+      note($('checkResult'), 'bad',
+        'Reached the deployment, but it is missing: ' + missing.join(', ') +
+        '. Whoever deployed it needs to add those environment variables.');
+      return;
+    }
+    if (result.requiresKey && !$('accessKey').value.trim()) {
+      note($('checkResult'), 'bad',
+        'Deployment is healthy, but it requires an access key — ask whoever set it up, and paste it above.');
+      return;
+    }
+    note($('checkResult'), 'ok',
+      'Deployment is healthy' + (result.configured.log ? ' (with the shared event log on).' : '.'));
   });
 
   $('tryIt').addEventListener('click', function () { window.mbapp.dictateNow(); });

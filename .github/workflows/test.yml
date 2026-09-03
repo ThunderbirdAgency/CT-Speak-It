@@ -1,0 +1,30 @@
+# Every push runs the whole suite: connector request shapes, the API as Vercel
+# invokes it, the desktop main process headlessly, and the widget in Chromium.
+# Nothing here touches the network or needs a secret.
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium for the widget tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: npm test

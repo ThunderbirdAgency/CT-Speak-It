@@ -25,5 +25,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
 }

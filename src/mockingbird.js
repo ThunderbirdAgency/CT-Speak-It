@@ -61,6 +61,10 @@
     formatEndpoint: null,
     // Server transcription endpoint: POST audio/webm body -> {text}.
     transcribeEndpoint: null,
+    // Access key, if the deployment requires one (MOCKINGBIRD_ACCESS_KEY).
+    // In a browser this is readable by anyone with the page — it keeps out
+    // passers-by who learn the URL, it is not a secret. See docs/INSTALL.md.
+    accessKey: null,
     // Voice-actions endpoint: POST {text, actions, connectors, appContext, dictionary, user}
     //   -> {kind:'actions', actions:[{name, input, connector, execute}, ...]} | {kind:'dictation', text}.
     actionsEndpoint: null,
@@ -250,6 +254,13 @@
       } else {
         this.savedRange = { start: el.selectionStart, end: el.selectionEnd };
       }
+    },
+
+    // Headers for every call to the deployment.
+    _headers: function (contentType) {
+      var headers = { 'Content-Type': contentType || 'application/json' };
+      if (this.opts.accessKey) headers['X-Mockingbird-Key'] = this.opts.accessKey;
+      return headers;
     },
 
     _dictionary: function () {
@@ -536,11 +547,10 @@
           self._setState('polishing', 'Transcribing…');
           fetch(self.opts.transcribeEndpoint, {
             method: 'POST',
-            headers: {
-              'Content-Type': blob.type,
+            headers: Object.assign(self._headers(blob.type || 'audio/webm'), {
               'X-Mockingbird-Lang': self.opts.lang,
               'X-Mockingbird-User': self.opts.userId || ''
-            },
+            }),
             body: blob
           })
             .then(function (r) { if (!r.ok) throw new Error('Transcription failed (' + r.status + ')'); return r.json(); })
@@ -575,7 +585,7 @@
       this._setState('polishing', 'Understanding…');
       fetch(this.opts.actionsEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._headers(),
         body: JSON.stringify({
           text: raw,
           actions: this.opts.actions,
@@ -672,7 +682,7 @@
       this._setState('polishing', 'Doing it…');
       fetch(this.opts.actEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._headers(),
         body: JSON.stringify({
           actions: actions.map(function (a) { return { name: a.name, input: a.input }; }),
           connectors: this.opts.connectors,
@@ -708,7 +718,7 @@
       this._setState('polishing');
       fetch(this.opts.formatEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._headers(),
         body: JSON.stringify({
           text: raw,
           tone: this.opts.tone,
@@ -916,6 +926,7 @@
         if (d.transcribeEndpoint) opts.transcribeEndpoint = d.transcribeEndpoint;
         if (d.actionsEndpoint) opts.actionsEndpoint = d.actionsEndpoint;
         if (d.actEndpoint) opts.actEndpoint = d.actEndpoint;
+        if (d.accessKey) opts.accessKey = d.accessKey;
         if (d.connectors) opts.connectors = d.connectors.split(',').map(function (c) { return c.trim(); }).filter(Boolean);
         if (d.confirmActions === 'false') opts.confirmActions = false;
         if (d.learn === 'false') opts.learn = false;

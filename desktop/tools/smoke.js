@@ -92,7 +92,7 @@ let actShouldFail = false;
 
 global.fetch = async (url, init = {}) => {
   const route = String(url).replace('https://deploy.test', '');
-  calls.push({ route, body: init.body });
+  calls.push({ route, body: init.body, headers: init.headers || {} });
   const json = (status, data) => ({
     ok: status < 400, status,
     text: async () => JSON.stringify(data)
@@ -121,6 +121,7 @@ global.fetch = async (url, init = {}) => {
 
 fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({
   baseUrl: 'https://deploy.test',
+  accessKey: 'desktop-key',
   userId: 'smoke',
   connectors: [{ id: 'followupboss', type: 'followupboss', label: 'Follow Up Boss', enabled: true, credentials: { apiKey: 'k' } }]
 }));
@@ -176,6 +177,10 @@ function check(name, fn) {
   ipcOn['mb:confirm-response'](null, { accept: true });
   await wait(60);
   check('Enter runs it', () => assert.ok(calls.some((c) => c.route === '/api/act')));
+  check('the deployment access key is sent', () => {
+    const call = calls.find((c) => c.route === '/api/act');
+    assert.strictEqual(call.headers['X-Mockingbird-Key'], 'desktop-key');
+  });
   check('credentials go with the request', () => {
     const body = JSON.parse(calls.find((c) => c.route === '/api/act').body);
     assert.strictEqual(body.connectors[0].credentials.apiKey, 'k');

@@ -26,6 +26,7 @@ const { execFile } = require('child_process');
 
 const DEFAULT_CONFIG = {
   baseUrl: '',                                    // your Mockingbird deployment
+  accessKey: '',                                  // if the deployment requires one
   userId: '',                                     // who is speaking (for the event log + profile)
   dictationHotkey: 'CommandOrControl+Shift+Space',
   commandHotkey: 'CommandOrControl+Shift+K',
@@ -120,6 +121,7 @@ async function api(pathname, { method = 'POST', body, headers = {}, timeoutMs = 
       method,
       headers: Object.assign(
         body instanceof Buffer ? {} : { 'Content-Type': 'application/json' },
+        cfg.accessKey ? { 'X-Mockingbird-Key': cfg.accessKey } : {},
         headers
       ),
       body: body instanceof Buffer ? body : body ? JSON.stringify(body) : undefined,
@@ -399,7 +401,7 @@ async function runActions(actions, transcript, cfg) {
 
 /** Give focus back to whatever the user was working in. */
 function restoreFocus() {
-  if (process.platform === 'darwin' && app.hide) {
+  if (process.platform === 'darwin' && typeof app.hide === 'function') {
     try { app.hide(); } catch (e) { /* no-op when nothing was focused */ }
   } else if (overlay && !overlay.isDestroyed()) {
     overlay.blur();
@@ -552,13 +554,13 @@ function openSettings(tab) {
   settingsWindow.setMenuBarVisibility(false);
   settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
   settingsWindow.once('ready-to-show', () => {
-    if (process.platform === 'darwin' && app.dock) app.dock.show();
+    showDock();
     settingsWindow.show();
     if (tab) settingsWindow.webContents.send('mb:open-tab', tab);
   });
   settingsWindow.on('closed', () => {
     settingsWindow = null;
-    if (process.platform === 'darwin' && app.dock) app.dock.hide();
+    hideDock();
   });
   // Links in the settings window open in the real browser.
   settingsWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -568,6 +570,18 @@ function openSettings(tab) {
 }
 
 // ------------------------------------------------------------------ tray
+
+// The dock only exists on macOS, and Electron has reshaped `app.dock` across
+// major versions — feature-detect instead of assuming it is callable.
+function hideDock() {
+  if (process.platform !== 'darwin') return;
+  if (app.dock && typeof app.dock.hide === 'function') app.dock.hide();
+}
+
+function showDock() {
+  if (process.platform !== 'darwin') return;
+  if (app.dock && typeof app.dock.show === 'function') app.dock.show();
+}
 
 function trayImage() {
   const file = process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png';

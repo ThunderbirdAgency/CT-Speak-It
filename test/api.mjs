@@ -282,6 +282,41 @@ await check('a transcription request with no provider configured explains itself
   assert.match(res.body.error, /GROQ_API_KEY/);
 });
 
+console.log('access key');
+await check('with a key configured, an unauthenticated request is refused', async () => {
+  process.env.MOCKINGBIRD_ACCESS_KEY = 'sekrit';
+  const res = mockRes();
+  await format(mockReq('POST', { body: { text: 'hello' } }), res);
+  assert.strictEqual(res.statusCode, 401);
+  assert.match(res.body.error, /access key/i);
+});
+
+await check('the right key gets through', async () => {
+  claudeReplies = [claudeMessage([{ type: 'text', text: 'Hello.' }])];
+  const res = mockRes();
+  await format(mockReq('POST', {
+    body: { text: 'hello' }, headers: { 'x-mockingbird-key': 'sekrit' }
+  }), res);
+  assert.strictEqual(res.statusCode, 200);
+  assert.strictEqual(res.body.text, 'Hello.');
+});
+
+await check('a near-miss key is still refused', async () => {
+  const res = mockRes();
+  await format(mockReq('POST', {
+    body: { text: 'hello' }, headers: { 'x-mockingbird-key': 'sekri' }
+  }), res);
+  assert.strictEqual(res.statusCode, 401);
+});
+
+await check('the health check still answers, and says a key is needed', async () => {
+  const res = mockRes();
+  await tools(mockReq('GET'), res);
+  assert.strictEqual(res.statusCode, 200);
+  assert.strictEqual(res.body.requiresKey, true);
+  delete process.env.MOCKINGBIRD_ACCESS_KEY;
+});
+
 server.close();
 console.log(failures ? '\nFAILED' : '\nall good');
 process.exit(failures ? 1 : 0);
