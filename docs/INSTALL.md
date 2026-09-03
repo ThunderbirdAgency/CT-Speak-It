@@ -27,6 +27,7 @@ Then set the environment variables on the project:
 | `OPENAI_API_KEY` | `whisper-1` instead | alternative |
 | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Event log + the voice profile that makes it sound like each person | recommended |
 | `ALLOWED_ORIGINS` | Lock the web widget to your own domains | recommended |
+| `MOCKINGBIRD_ACCESS_KEY` | Require a key on every endpoint that costs money | **read the note below** |
 | `FOLLOWUPBOSS_API_KEY` | Team-wide Follow Up Boss, so no key ever reaches a laptop | optional |
 | `CONNECTOR_ALLOWED_HOSTS` | Restrict custom connectors to hosts you name | optional |
 | `MOCKINGBIRD_LEARNING=off` | Kill the profile layer entirely | optional |
@@ -35,10 +36,32 @@ Check it:
 
 ```bash
 curl https://your-deployment.vercel.app/api/tools
-# {"connectors":[...],"configured":{"transcription":true,"ai":true,"log":true,...}}
+# {"connectors":[...],"requiresKey":false,"configured":{"transcription":true,"ai":true,"log":true,...}}
 ```
 
-Anything `false` in `configured` is a missing environment variable.
+Anything `false` in `configured` is a missing environment variable. The
+deployment's own front page says the same thing in plain language — open it in
+a browser and it checks itself.
+
+### A word about who can reach your deployment
+
+A Vercel production URL is public. With keys configured and nothing else set,
+anyone who learns the URL can POST to `/api/format` and spend your Anthropic
+credits. `ALLOWED_ORIGINS` does not prevent this — CORS only constrains
+browsers and says nothing to `curl`.
+
+Set **`MOCKINGBIRD_ACCESS_KEY`** to any long random string and every endpoint
+that costs money requires it. Clients send it as `X-Mockingbird-Key`:
+
+- **Desktop:** Settings → Access key. Give agents the key with the URL.
+- **Web apps:** `Mockingbird.init({ accessKey: '...' })`. Be clear-eyed about
+  this one — anything a page holds, its users can read. It stops passers-by,
+  it is not a secret. For a genuinely public page, proxy through your own
+  server instead.
+
+The `GET /api/tools` health check stays open either way, so a client can ask
+whether a deployment is set up before it has been handed a key. It reports
+which variables are set, never their values.
 
 ## 2. Create the tables (if you want it to remember)
 
@@ -78,8 +101,15 @@ Claude Code in that repo and let it do the wiring.
 ## 6. Verify end to end
 
 ```bash
-npm test    # connector request shapes, desktop flows, widget in a browser
+npm test    # 58 assertions: connectors, the API as Vercel invokes it,
+            # the desktop main process, and the widget in a real browser
 ```
+
+A successful Vercel build should report **six** serverless functions — one per
+endpoint (`act`, `actions`, `format`, `profile`, `tools`, `transcribe`). Files
+under `api/_lib/` are shared code, and Vercel skips underscore-prefixed
+directories; if you ever see more than six, something in `_lib` has been
+renamed out of that protection.
 
 Then, by hand, once:
 

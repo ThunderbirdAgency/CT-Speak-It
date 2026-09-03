@@ -68,6 +68,7 @@ Deploy this repo (Vercel), set two keys, and you're running:
 | `GROQ_API_KEY` *(or `DEEPGRAM_API_KEY` / `OPENAI_API_KEY`)* | Whisper-grade transcription — **required** |
 | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | event log + the voice profile ([LEARNING.md](docs/LEARNING.md)) |
 | `ALLOWED_ORIGINS` | CORS allowlist for the web widget |
+| `MOCKINGBIRD_ACCESS_KEY` | Require a key on every endpoint that costs money — a Vercel URL is public, and CORS is not access control |
 | `FOLLOWUPBOSS_API_KEY` | team-wide Follow Up Boss, no keys on laptops |
 | `CONNECTOR_ALLOWED_HOSTS` | restrict custom connectors to hosts you name |
 
@@ -181,6 +182,7 @@ Data attributes on the script tag, or `Mockingbird.init({...})`:
 | `actionsEndpoint` | `data-actions-endpoint` | — | Command vs dictation routing |
 | `actEndpoint` | `data-act-endpoint` | — | Executes connector actions |
 | `connectors` | `data-connectors` | `[]` | e.g. `followupboss` (names, never keys) |
+| `accessKey` | `data-access-key` | — | If the deployment sets `MOCKINGBIRD_ACCESS_KEY` |
 | `confirmActions` | `data-confirm-actions="false"` | `true` | Ask before touching a real system |
 | `learn` | `data-learn="false"` | `true` | Contribute to the voice profile |
 | `tone` | `data-tone` | `clean` | `clean` \| `formal` \| `casual` \| `code-comment` |
