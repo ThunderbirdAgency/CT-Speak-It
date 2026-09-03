@@ -37,7 +37,11 @@ async function openaiCompatible(url, apiKey, model, audio, contentType, lang) {
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form
   });
-  if (!r.ok) throw new Error(`transcription upstream ${r.status}: ${await r.text()}`);
+  if (!r.ok) {
+    const err = new Error(`transcription upstream ${r.status}: ${await r.text()}`);
+    err.status = r.status;
+    throw err;
+  }
   const data = await r.json();
   return (data.text || '').trim();
 }
@@ -50,7 +54,11 @@ async function deepgram(apiKey, audio, contentType, lang) {
     headers: { Authorization: `Token ${apiKey}`, 'Content-Type': contentType },
     body: audio
   });
-  if (!r.ok) throw new Error(`deepgram ${r.status}: ${await r.text()}`);
+  if (!r.ok) {
+    const err = new Error(`deepgram ${r.status}: ${await r.text()}`);
+    err.status = r.status;
+    throw err;
+  }
   const data = await r.json();
   return (data.results?.channels?.[0]?.alternatives?.[0]?.transcript || '').trim();
 }
@@ -92,6 +100,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ text });
   } catch (err) {
     console.error('mockingbird transcribe error:', err);
+    // A rejected key is a deployment problem, not a bad recording — say so,
+    // without repeating the provider's response to a public caller.
+    if (err.status === 401 || err.status === 403) {
+      return res.status(503).json({
+        error: "This deployment's transcription key was rejected. Check GROQ_API_KEY " +
+          '(or DEEPGRAM_API_KEY / OPENAI_API_KEY) in the project settings.'
+      });
+    }
     return res.status(502).json({ error: 'Transcription failed' });
   }
 }

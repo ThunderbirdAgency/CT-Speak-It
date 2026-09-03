@@ -24,6 +24,15 @@ export const EFFORT = {
   BACKGROUND: 'medium'
 };
 
+/**
+ * What a caller is told when the deployment's Claude credentials are missing or
+ * rejected. The upstream error goes to the function log, where an operator can
+ * read it; it is not echoed to a public endpoint.
+ */
+export const SETUP_MESSAGE =
+  "This deployment's ANTHROPIC_API_KEY is missing or was rejected by Claude. " +
+  'Check it in the Vercel project settings, then redeploy.';
+
 let client = null;
 
 /**

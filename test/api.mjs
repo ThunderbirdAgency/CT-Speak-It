@@ -22,6 +22,7 @@ async function check(name, fn) {
 
 const upstream = { anthropic: [], supabase: [], groq: [], fub: [] };
 let claudeReplies = [];   // queued responses for successive Claude calls
+let claudeRejects = false;  // when true, Claude answers 401 like a bad key does
 
 function claudeMessage(content) {
   return {
@@ -43,6 +44,9 @@ const server = http.createServer((req, res) => {
 
     if (req.url.startsWith('/anthropic/v1/messages')) {
       upstream.anthropic.push(json());
+      if (claudeRejects) {
+        return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' }, request_id: 'req_secret123' });
+      }
       return send(200, claudeReplies.shift() || claudeMessage([{ type: 'text', text: 'ok' }]));
     }
     if (req.url.startsWith('/groq')) {
@@ -270,6 +274,17 @@ await check('a missing ANTHROPIC_API_KEY is a sentence an operator can act on', 
   process.env.ANTHROPIC_API_KEY = saved;
   assert.strictEqual(res.statusCode, 503);
   assert.match(res.body.error, /ANTHROPIC_API_KEY/);
+});
+
+await check('a rejected key is reported as a setup problem, not leaked verbatim', async () => {
+  claudeRejects = true;
+  const res = mockRes();
+  await format(mockReq('POST', { body: { text: 'hello' } }), res);
+  claudeRejects = false;
+  assert.strictEqual(res.statusCode, 503);
+  assert.match(res.body.error, /ANTHROPIC_API_KEY/);
+  // The endpoint is public: the upstream body must not travel back out.
+  assert.doesNotMatch(res.body.error, /x-api-key|request_id|req_secret123/);
 });
 
 await check('a transcription request with no provider configured explains itself', async () => {

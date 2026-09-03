@@ -22,7 +22,7 @@
  * Response: { kind: 'actions', actions: [{name, input, connector?, execute?}] }
  *         | { kind: 'dictation', text }
  */
-import { claude, isSetupError, MODEL, EFFORT } from './_lib/claude.js';
+import { claude, isSetupError, MODEL, EFFORT, SETUP_MESSAGE } from './_lib/claude.js';
 import { logEvent } from './_lib/log.js';
 import { preflight } from './_lib/http.js';
 import { toolsFor } from './_lib/connectors/index.js';
@@ -170,8 +170,10 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('mockingbird actions error:', err);
     // Widget degrades to plain dictation on any non-200.
+    // Deliberately not the upstream message: this endpoint is public, and an
+    // operator needs the one sentence that tells them what to change anyway.
     return isSetupError(err)
-      ? res.status(503).json({ error: err.message || 'Claude is not configured on this deployment.' })
+      ? res.status(503).json({ error: SETUP_MESSAGE })
       : res.status(502).json({ error: 'Action resolution failed' });
   }
 }

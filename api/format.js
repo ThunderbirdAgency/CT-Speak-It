@@ -10,7 +10,7 @@
  * Request:  POST { text: string, tone?: string, appContext?: string, dictionary?: string[], user?: string }
  * Response: { text: string }
  */
-import { claude, isSetupError, MODEL, EFFORT } from './_lib/claude.js';
+import { claude, isSetupError, MODEL, EFFORT, SETUP_MESSAGE } from './_lib/claude.js';
 import { logEvent } from './_lib/log.js';
 import { preflight } from './_lib/http.js';
 import { profileContext, maybeRefresh } from './_lib/profile.js';
@@ -95,8 +95,10 @@ export default async function handler(req, res) {
     console.error('mockingbird format error:', err);
     // Widget falls back to the raw transcript on any non-200 — the user's
     // words are never lost, whichever of these it is.
+    // Deliberately not the upstream message: this endpoint is public, and an
+    // operator needs the one sentence that tells them what to change anyway.
     return isSetupError(err)
-      ? res.status(503).json({ error: err.message || 'Claude is not configured on this deployment.' })
+      ? res.status(503).json({ error: SETUP_MESSAGE })
       : res.status(502).json({ error: 'Formatting failed' });
   }
 }
