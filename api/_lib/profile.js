@@ -18,7 +18,7 @@
  *   - The distiller is told to stay on work: writing style, vocabulary,
  *     working patterns. Not personal characteristics.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { claude, MODEL, EFFORT } from './claude.js';
 import { sb, supabaseConfigured } from './log.js';
 
 const REFRESH_AFTER_EVENTS = 25;      // distill again once this many new events land
@@ -147,7 +147,10 @@ export async function distill(userId, { force = false } = {}) {
       `&select=created_at,app,kind,raw_text,output_text,actions,connector` +
       `&order=created_at.desc&limit=${MAX_EVENTS_PER_DISTILL}`
     );
-    if (!events || events.length < 5) return null;
+    // PostgREST returns a row array; anything else (an error shape, a single
+    // object) means we have nothing to distil from — leave the profile alone
+    // rather than throwing inside a background refresh.
+    if (!Array.isArray(events) || events.length < 5) return null;
 
     if (!force && existing) {
       const age = Date.now() - new Date(existing.updated_at).getTime();
@@ -167,10 +170,11 @@ export async function distill(userId, { force = false } = {}) {
       })
       .join('\n');
 
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
+    const response = await claude().messages.create({
+      model: MODEL,
       max_tokens: 2048,
+      // Nobody is waiting on this one — it runs after the response was sent.
+      output_config: { effort: EFFORT.BACKGROUND },
       system: DISTILL_SYSTEM,
       tools: [PROFILE_TOOL],
       tool_choice: { type: 'tool', name: 'profile' },

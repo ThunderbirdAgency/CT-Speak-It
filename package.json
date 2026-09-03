@@ -1,16 +1,17 @@
 {
   "name": "mockingbird",
-  "version": "3.0.0",
-  "description": "Mockingbird \u2014 voice for every Thunderbird build. Dictation that lands Claude-polished text at your cursor, and voice actions that turn speech into structured CRM objects.",
+  "version": "4.0.0",
+  "description": "Mockingbird \u2014 talk instead of type anywhere on your machine, and tell your CRM what to do. Dictation that lands Claude-polished text at your cursor, plus voice commands executed against Follow Up Boss and any product that can describe its endpoints.",
   "main": "src/mockingbird.js",
   "files": [
     "src",
     "api",
-    "db"
+    "db",
+    "vercel.json"
   ],
   "scripts": {
     "demo": "npx serve .",
-    "test": "node test/server.mjs && node desktop/tools/smoke.js && node test/widget.cjs"
+    "test": "node test/server.mjs && node test/api.mjs && node desktop/tools/smoke.js && node test/widget.cjs"
   },
   "keywords": [
     "dictation",
@@ -22,7 +23,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.123.0"
   },
   "type": "module"
 }

@@ -10,12 +10,11 @@
  * Request:  POST { text: string, tone?: string, appContext?: string, dictionary?: string[], user?: string }
  * Response: { text: string }
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { claude, isSetupError, MODEL, EFFORT } from './_lib/claude.js';
 import { logEvent } from './_lib/log.js';
 import { preflight } from './_lib/http.js';
 import { profileContext, maybeRefresh } from './_lib/profile.js';
 
-const client = new Anthropic();
 
 const TONES = {
   clean: 'Neutral and natural — keep the speaker\'s voice, just make it read well.',
@@ -51,9 +50,12 @@ export default async function handler(req, res) {
   const { block: profileBlock } = await profileContext(user, learn);
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
+    const response = await claude().messages.create({
+      model: MODEL,
       max_tokens: 4096,
+      // Someone is watching their cursor: polish is a short, well-specified
+      // task, so spend the time budget on getting the words back quickly.
+      output_config: { effort: EFFORT.FAST },
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -91,7 +93,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ text: cleaned || text });
   } catch (err) {
     console.error('mockingbird format error:', err);
-    // Widget falls back to the raw transcript on any non-200.
-    return res.status(502).json({ error: 'Formatting failed' });
+    // Widget falls back to the raw transcript on any non-200 — the user's
+    // words are never lost, whichever of these it is.
+    return isSetupError(err)
+      ? res.status(503).json({ error: err.message || 'Claude is not configured on this deployment.' })
+      : res.status(502).json({ error: 'Formatting failed' });
   }
 }

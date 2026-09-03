@@ -22,13 +22,12 @@
  * Response: { kind: 'actions', actions: [{name, input, connector?, execute?}] }
  *         | { kind: 'dictation', text }
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { claude, isSetupError, MODEL, EFFORT } from './_lib/claude.js';
 import { logEvent } from './_lib/log.js';
 import { preflight } from './_lib/http.js';
 import { toolsFor } from './_lib/connectors/index.js';
 import { profileContext, maybeRefresh } from './_lib/profile.js';
 
-const client = new Anthropic();
 
 const SYSTEM_PROMPT = `You route raw voice-dictation transcripts for someone running their business by voice.
 
@@ -103,9 +102,13 @@ export default async function handler(req, res) {
   const { block: profileBlock } = await profileContext(user, learn);
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
+    const response = await claude().messages.create({
+      model: MODEL,
       max_tokens: 4096,
+      // Routing one short utterance against a handful of tools is not a hard
+      // reasoning problem, and the user confirms the result before anything is
+      // written — so this path is tuned for speed.
+      output_config: { effort: EFFORT.FAST },
       system: SYSTEM_PROMPT + (mode === 'command' ? COMMAND_MODE_NOTE : ''),
       tools,
       tool_choice: { type: 'any' },
@@ -167,6 +170,8 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('mockingbird actions error:', err);
     // Widget degrades to plain dictation on any non-200.
-    return res.status(502).json({ error: 'Action resolution failed' });
+    return isSetupError(err)
+      ? res.status(503).json({ error: err.message || 'Claude is not configured on this deployment.' })
+      : res.status(502).json({ error: 'Action resolution failed' });
   }
 }
