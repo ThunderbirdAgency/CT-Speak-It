@@ -3,257 +3,524 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Mockingbird — install</title>
+<title>Mockingbird — talk instead of type, and it does the rest</title>
+<meta name="description" content="Mockingbird turns your voice into polished text anywhere on your Mac or PC — then goes further than dictation ever has. Say what you want done and it happens, in Follow Up Boss or whatever you run your business on.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b0f14; --panel: #131a23; --line: #212b37;
-    --ink: #e8ecf1; --muted: #93a1b2; --accent: #6ea8fe;
-    --ok: #3fbf78; --bad: #e06c6c; --warn: #d9a521;
+    --ink: #0d1117;
+    --ink-2: #3d4855;
+    --muted: #6b7787;
+    --line: #e6e9ee;
+    --bg: #ffffff;
+    --bg-2: #f7f8fa;
+    --accent: #4f46e5;
+    --accent-2: #7c6cf0;
+    --ok: #16a34a;
+    --radius: 18px;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 12px 32px -8px rgba(16,24,40,.10);
+    --shadow-lg: 0 2px 4px rgba(16,24,40,.04), 0 30px 70px -18px rgba(16,24,40,.22);
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
-    font: 400 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased;
+    font: 400 17px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased; letter-spacing: -.011em;
   }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 100px; }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
-  header { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; }
-  .mark {
-    width: 46px; height: 46px; border-radius: 13px; flex: none; display: grid; place-items: center;
-    background: linear-gradient(160deg, #1e2530, #0a0e12);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 20px rgba(0,0,0,.4);
+  h1, h2, h3 { letter-spacing: -.032em; line-height: 1.08; margin: 0; font-weight: 700; }
+  h1 { font-size: clamp(40px, 6.2vw, 68px); font-weight: 800; }
+  h2 { font-size: clamp(30px, 4.2vw, 44px); }
+  h3 { font-size: 19px; letter-spacing: -.018em; line-height: 1.3; }
+  p { margin: 0; }
+  .lede { font-size: clamp(17px, 2.1vw, 21px); color: var(--ink-2); line-height: 1.55; }
+  .eyebrow {
+    font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 14px;
   }
-  .mark svg { width: 24px; height: 24px; }
-  h1 { font-size: 26px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
-  header p { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
 
-  h2 { font-size: 15px; font-weight: 650; margin: 40px 0 14px; letter-spacing: .01em; }
+  /* ---------------------------------------------------------------- nav */
+  nav {
+    position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.82);
+    -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
+    border-bottom: 1px solid transparent; transition: border-color .2s ease;
+  }
+  nav.stuck { border-bottom-color: var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.02em; font-size: 17px; }
+  .logo .mk {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(160deg, #232c38, #0b0f14);
+    box-shadow: 0 2px 8px rgba(16,24,40,.24);
+  }
+  .logo .mk svg { width: 16px; height: 16px; }
+  nav .links { display: flex; gap: 26px; margin-left: auto; font-size: 15px; color: var(--ink-2); font-weight: 500; }
+  nav .links a:hover { color: var(--ink); }
+  @media (max-width: 780px) { nav .links { display: none; } }
 
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 13px 22px; border-radius: 12px; font-size: 15.5px; font-weight: 600;
+    background: var(--ink); color: #fff; border: 1px solid var(--ink);
+    transition: transform .16s cubic-bezier(.2,1.3,.4,1), box-shadow .16s ease, background .16s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px -6px rgba(16,24,40,.35); }
+  .btn.ghost { background: #fff; color: var(--ink); border-color: var(--line); }
+  .btn.ghost:hover { border-color: #c9cfd8; box-shadow: 0 8px 22px -10px rgba(16,24,40,.2); }
+  .btn.sm { padding: 9px 16px; font-size: 14.5px; border-radius: 10px; }
+  .btn svg { width: 17px; height: 17px; }
 
-  /* health */
-  .health { display: flex; align-items: flex-start; gap: 13px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; margin-top: 8px; }
-  .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(63,191,120,.15); }
-  .dot.bad { background: var(--bad); box-shadow: 0 0 0 4px rgba(224,108,108,.15); }
-  .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(217,165,33,.15); }
-  .health .body { flex: 1; min-width: 0; }
-  .health strong { font-weight: 600; }
-  .health .detail { color: var(--muted); font-size: 14px; margin-top: 3px; }
+  /* --------------------------------------------------------------- hero */
+  .hero { padding: 76px 0 0; position: relative; overflow: hidden; isolation: isolate; }
+  .hero .wrap { position: relative; z-index: 1; }
+  /* The glow sits inside the hero's own box — pulled above it, the bright
+     centre was being clipped by overflow:hidden and only the faint tail showed. */
+  .hero::before {
+    content: ''; position: absolute; inset: 0 0 auto; height: 760px; z-index: 0;
+    background:
+      radial-gradient(900px 420px at 42% 6%, rgba(124,108,240,.22), transparent 66%),
+      radial-gradient(620px 340px at 88% 2%, rgba(79,70,229,.16), transparent 68%),
+      radial-gradient(520px 300px at 8% 26%, rgba(167,139,250,.13), transparent 70%);
+  }
+  .hero-inner { max-width: 780px; }
+  .hero h1 span { background: linear-gradient(94deg, var(--accent), #a78bfa 60%, #6366f1); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero .lede { margin-top: 22px; max-width: 640px; }
+  .cta { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; align-items: center; }
+  .cta .note { font-size: 14px; color: var(--muted); }
 
-  /* the URL to copy */
-  .url {
-    display: flex; align-items: center; gap: 10px; margin-top: 14px;
-    background: #0a0e13; border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px;
+  /* ------------------------------------------------------------ mockups */
+  .screen {
+    background: #0d1117; border-radius: 16px; box-shadow: var(--shadow-lg);
+    overflow: hidden; border: 1px solid rgba(255,255,255,.07);
   }
-  .url code {
-    flex: 1; min-width: 0; font: 500 14px ui-monospace, SFMono-Regular, Menlo, monospace;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b9d2ff;
+  .screen .bar {
+    height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 15px;
+    background: #161d27; border-bottom: 1px solid rgba(255,255,255,.06);
   }
-  button.copy {
-    all: unset; cursor: pointer; flex: none; font-size: 13px; font-weight: 600; color: var(--muted);
-    padding: 5px 11px; border-radius: 7px; background: #182029; box-shadow: inset 0 0 0 1px var(--line);
+  .screen .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2c3644; display: block; }
+  .screen .bar .title {
+    margin-left: 12px; font-size: 12.5px; color: #7d8899; font-weight: 500;
   }
-  button.copy:hover { color: var(--ink); }
+  .screen .body { padding: 26px 26px 30px; position: relative; min-height: 250px; }
 
-  /* steps */
-  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
-  ol.steps li {
-    counter-increment: s; position: relative; padding: 0 0 22px 44px;
-    border-left: 1px solid var(--line); margin-left: 13px;
-  }
-  ol.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
-  ol.steps li::before {
-    content: counter(s); position: absolute; left: -13px; top: -2px;
-    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--panel); box-shadow: inset 0 0 0 1px var(--line);
-    font-size: 13px; font-weight: 650; color: var(--muted);
-  }
-  ol.steps b { display: block; font-weight: 600; margin-bottom: 2px; }
-  ol.steps p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .mail-field { font-size: 14px; color: #6d7889; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .mail-field b { color: #aab5c4; font-weight: 500; }
+  .mail-text { color: #dbe3ec; font-size: 15px; line-height: 1.65; padding-top: 18px; min-height: 76px; }
+  .caret { display: inline-block; width: 2px; height: 17px; background: #7c6cf0; vertical-align: -3px; margin-left: 1px; animation: blink 1.05s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
 
-  .downloads { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
-  a.dl {
-    flex: 1; min-width: 200px; text-decoration: none; color: inherit;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    padding: 16px 18px; display: block; transition: border-color .15s ease, transform .15s ease;
+  /* the overlay pill / card, same design language as the real app */
+  .pill {
+    position: absolute; right: 22px; bottom: 22px; width: min(330px, calc(100% - 44px));
+    background: rgba(18,24,32,.97); border-radius: 15px; color: #e8ecf1;
+    box-shadow: 0 12px 34px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08);
+    font-size: 13px; overflow: hidden;
   }
-  a.dl:hover { border-color: var(--accent); transform: translateY(-1px); }
-  a.dl.disabled { opacity: .5; pointer-events: none; }
-  a.dl b { display: block; font-weight: 600; }
-  a.dl span { color: var(--muted); font-size: 13.5px; }
+  .pill .row { display: flex; align-items: center; gap: 11px; padding: 13px 15px; }
+  .pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #e04545; flex: none; animation: pulse 1.5s ease infinite; }
+  .pill.blue .dot { background: #6ea8fe; animation: none; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.35); opacity: .55 } }
+  .bars { display: inline-flex; gap: 3px; align-items: center; height: 18px; flex: none; }
+  .bars i { width: 3px; border-radius: 2px; background: #ff9d94; height: 5px; animation: eq .9s ease-in-out infinite; }
+  .bars i:nth-child(2) { animation-delay: .1s } .bars i:nth-child(3) { animation-delay: .22s }
+  .bars i:nth-child(4) { animation-delay: .34s } .bars i:nth-child(5) { animation-delay: .46s }
+  @keyframes eq { 0%,100% { height: 5px } 50% { height: 15px } }
+  .pill .label { flex: 1; min-width: 0; color: rgba(232,236,241,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill .action { border-top: 1px solid rgba(255,255,255,.07); padding: 12px 15px; }
+  .pill .action .t { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+  .pill .action .where { font-size: 10.5px; font-weight: 500; padding: 2px 7px; border-radius: 99px; background: rgba(110,168,254,.16); color: #a9caff; }
+  .pill .fields { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin-top: 7px; font-size: 12px; }
+  .pill .fields dt { color: rgba(232,236,241,.5); }
+  .pill .fields dd { margin: 0; color: #dbe3ec; }
+  .pill .foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 9px 15px; border-top: 1px solid rgba(255,255,255,.07);
+    background: rgba(255,255,255,.02); font-size: 11.5px; color: rgba(232,236,241,.55);
+  }
+  .k { padding: 1.5px 6px; border-radius: 5px; background: rgba(255,255,255,.1); font-weight: 600; color: #cfe0ff; }
 
-  kbd {
-    font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 7px;
-    border-radius: 6px; background: #182029; box-shadow: inset 0 0 0 1px var(--line); color: #cfe0ff;
+  .hero-shot { margin-top: 54px; position: relative; }
+  .hero-shot .screen { max-width: 900px; margin: 0 auto; }
+
+  /* ------------------------------------------------------------ sections */
+  section { padding: 92px 0; }
+  section.tint { background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .head { max-width: 700px; margin-bottom: 46px; }
+  .head p { margin-top: 16px; }
+
+  .apps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+  .apps span {
+    font-size: 14px; font-weight: 500; color: var(--ink-2);
+    padding: 8px 15px; border-radius: 99px; background: #fff; border: 1px solid var(--line);
   }
-  .say { color: var(--muted); font-style: italic; }
-  footer { margin-top: 48px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 20px; }
-  footer a { color: var(--accent); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 40px; } }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px 24px; box-shadow: var(--shadow);
+  }
+  .card .ic {
+    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 16px;
+    background: linear-gradient(160deg, #f0efff, #e6e9ff); color: var(--accent);
+  }
+  .card .ic svg { width: 19px; height: 19px; }
+  .card h3 { margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: 15.5px; line-height: 1.55; }
+
+  .say {
+    font-size: clamp(20px, 2.6vw, 27px); line-height: 1.4; font-weight: 500;
+    color: var(--ink); letter-spacing: -.022em;
+  }
+  .say .q { color: var(--accent); }
+
+  ol.flow { list-style: none; padding: 0; margin: 0; counter-reset: f; display: grid; gap: 4px; }
+  ol.flow li { counter-increment: f; display: flex; gap: 16px; padding: 16px 0; }
+  ol.flow li::before {
+    content: counter(f); flex: none; width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 13.5px; font-weight: 700;
+    background: var(--ink); color: #fff;
+  }
+  ol.flow b { display: block; font-weight: 600; margin-bottom: 3px; }
+  ol.flow p { color: var(--muted); font-size: 15.5px; }
+
+  details {
+    border-bottom: 1px solid var(--line); padding: 20px 0;
+  }
+  details summary {
+    cursor: pointer; font-weight: 600; font-size: 17px; list-style: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 20px;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 22px; line-height: 1; }
+  details[open] summary::after { content: '−'; }
+  details p { color: var(--muted); font-size: 16px; margin-top: 12px; max-width: 68ch; }
+
+  .final {
+    text-align: center; padding: 96px 24px;
+    background: linear-gradient(168deg, #10151c, #0b0f14);
+    color: #fff; border-radius: 26px; margin: 0 auto 96px; max-width: 1032px;
+  }
+  .final h2 { color: #fff; }
+  .final p { color: rgba(255,255,255,.62); margin: 18px auto 0; max-width: 500px; }
+  .final .cta { justify-content: center; }
+  .final .btn { background: #fff; color: var(--ink); border-color: #fff; }
+  .final .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.25); }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--muted); font-size: 14.5px; }
+  footer .wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  footer a { color: var(--ink-2); }
+  footer a:hover { color: var(--ink); }
+  footer .sep { margin-left: auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+    html { scroll-behavior: auto; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header>
-    <span class="mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#e8ecf1" stroke-width="2" stroke-linecap="round">
-        <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
-        <path d="M18 11a6 6 0 0 1-12 0"/><line x1="12" y1="17" x2="12" y2="21"/>
-      </svg>
-    </span>
-    <div>
-      <h1>Mockingbird</h1>
-      <p>Talk instead of type — anywhere on your machine — and tell your CRM what to do.</p>
+<nav id="nav">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <span class="mk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
+          <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
+          <path d="M18 11a6 6 0 0 1-12 0"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </span>
+      Mockingbird
+    </a>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#actions">Taking action</a>
+      <a href="#learns">What it learns</a>
+      <a href="/install">Set up</a>
     </div>
-  </header>
+    <a class="btn sm" href="#download">Download</a>
+  </div>
+</nav>
 
-  <div class="card">
-    <div class="health">
-      <span class="dot" id="dot"></span>
-      <div class="body">
-        <strong id="healthTitle">Checking this deployment…</strong>
-        <div class="detail" id="healthDetail">One moment.</div>
+<!-- ---------------------------------------------------------------- hero -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-inner">
+      <h1>Talk instead of type.<br><span>Then it does the rest.</span></h1>
+      <p class="lede">
+        Hold one key anywhere on your Mac or PC and say it out loud — clean, professional
+        text lands where your cursor is. Then Mockingbird goes further than dictation ever
+        has: tell it what you want done, and it does it, in your CRM.
+      </p>
+      <div class="cta" id="download">
+        <a class="btn" id="dlPrimary" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="dlPrimaryLabel">Download for Mac</span></a>
+        <a class="btn ghost" id="dlSecondary" href="#"><span id="dlSecondaryLabel">Download for Windows</span></a>
+        <span class="note">Mac and Windows · about two minutes to set up</span>
       </div>
     </div>
-    <div class="url">
-      <code id="deploymentUrl">…</code>
-      <button class="copy" id="copyUrl">Copy</button>
+
+    <div class="hero-shot">
+      <div class="screen">
+        <div class="bar"><i></i><i></i><i></i><span class="title">New message</span></div>
+        <div class="body">
+          <div class="mail-field"><b>To:</b> maria.lopez@example.com</div>
+          <div class="mail-field"><b>Subject:</b> 123 Main Street — following up</div>
+          <div class="mail-text" id="typed"></div>
+          <div class="pill">
+            <div class="row">
+              <span class="dot"></span>
+              <span class="bars"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="label">Listening… press again to finish</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="detail" style="color:var(--muted);font-size:13.5px;margin-top:9px">
-      This is the address Mockingbird asks for when it first opens. Copy it now — you'll paste it in step 2.
+  </div>
+</header>
+
+<!-- --------------------------------------------------------- everywhere -->
+<section>
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">Everywhere you already work</div>
+      <h2>If it has a cursor, you can talk to it.</h2>
+      <p class="lede">
+        Mockingbird isn't a text box you paste out of. It lives in your menu bar and follows
+        you into every application on the machine — no integration, no plugin, nothing for
+        the other app to support.
+      </p>
+      <div class="apps">
+        <span>Gmail</span><span>Outlook</span><span>Slack</span><span>Word</span>
+        <span>Google Docs</span><span>iMessage</span><span>Notion</span><span>Salesforce</span>
+        <span>Follow Up Boss</span><span>your CRM</span><span>…anything else</span>
+      </div>
     </div>
   </div>
+</section>
 
-  <h2>Get the app</h2>
-  <div class="downloads">
-    <a class="dl" id="dlMac" href="#"><b>Download for Mac</b><span>Apple silicon &amp; Intel · one file for both</span></a>
-    <a class="dl" id="dlWin" href="#"><b>Download for Windows</b><span>10 and 11 · installer</span></a>
+<!-- ------------------------------------------------------------- actions -->
+<section class="tint" id="actions">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <div class="eyebrow">The part dictation can't do</div>
+        <h2>Say what you want done. Press Enter.</h2>
+        <p class="lede" style="margin-top:18px">
+          Every other dictation app stops at typing. Mockingbird keeps going: it understands
+          what you asked for, shows you exactly what it's about to do, and waits.
+        </p>
+        <p class="say" style="margin-top:28px">
+          <span class="q">“</span>Add Maria Lopez, 555-0142, from the open house at 123 Main,
+          and remind me to call her Monday.<span class="q">”</span>
+        </p>
+        <p class="lede" style="margin-top:24px; font-size:17px">
+          Two records from one sentence, in the real system — before you're out of the
+          driveway. Nothing is written until you press Enter.
+        </p>
+      </div>
+      <div>
+        <div class="screen">
+          <div class="bar"><i></i><i></i><i></i><span class="title">Follow Up Boss</span></div>
+          <div class="body" style="min-height:290px">
+            <div class="pill blue" style="position:static; width:100%">
+              <div class="row">
+                <span class="dot"></span>
+                <span class="label" style="color:#e8ecf1; font-weight:600">2 things to do</span>
+              </div>
+              <div class="action">
+                <div class="t">Create person <span class="where">Follow Up Boss</span></div>
+                <dl class="fields">
+                  <dt>name</dt><dd>Maria Lopez</dd>
+                  <dt>phone</dt><dd>555-0142</dd>
+                  <dt>source</dt><dd>Open house at 123 Main St</dd>
+                </dl>
+              </div>
+              <div class="action">
+                <div class="t">Create task <span class="where">Follow Up Boss</span></div>
+                <dl class="fields">
+                  <dt>title</dt><dd>Call Maria Lopez</dd>
+                  <dt>dueDate</dt><dd>Monday, 9:00 AM</dd>
+                </dl>
+              </div>
+              <div class="foot">
+                <span>Enter runs both</span>
+                <span><span class="k">↵</span> run &nbsp; <span class="k">esc</span> cancel</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+</section>
 
-  <h2>Set it up — about a minute</h2>
-  <ol class="steps">
-    <li>
-      <b>Install it</b>
-      <p>Mac: open the .dmg and drag Mockingbird to Applications. The first time, right-click it and choose Open.<br>
-         Windows: run the installer and click through the SmartScreen warning.</p>
-    </li>
-    <li>
-      <b>Paste the address above, and your name</b>
-      <p>Mockingbird opens asking for two things. That's the whole setup — press Save.</p>
-    </li>
-    <li>
-      <b>Allow the microphone</b>
-      <p>It asks the first time you speak. On a Mac, also switch Mockingbird on under
-         System Settings → Privacy &amp; Security → Accessibility, so text pastes itself.
-         Until you do, your words wait on the clipboard and you press Cmd+V.</p>
-    </li>
-  </ol>
-
-  <h2>Using it</h2>
-  <div class="card">
-    <p style="margin:0 0 14px"><kbd id="dictateKey">Ctrl+Shift+Space</kbd> &nbsp;<b>Dictate.</b>
-      Put your cursor anywhere — an email, a text box, a CRM field — press it, talk, press it again.
-      Your words land polished. Escape cancels.</p>
-    <p style="margin:0"><kbd id="commandKey">Ctrl+Shift+K</kbd> &nbsp;<b>Tell it to do something.</b>
-      <span class="say">“Add Maria Lopez, 555-0142, from the open house, and remind me to call her Monday.”</span>
-      It shows you exactly what it's about to do — press <kbd>Enter</kbd> and it's done.
-      Nothing gets written until you press it.</p>
+<!-- --------------------------------------------------------------- how -->
+<section id="how">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <div class="eyebrow">How it works</div>
+        <h2>One key. That's the whole interface.</h2>
+        <ol class="flow" style="margin-top:30px">
+          <li><div><b>Press and talk</b><p>Put your cursor anywhere and hold the shortcut. A small pill shows it's listening.</p></div></li>
+          <li><div><b>It cleans you up</b><p>“Um” disappears. Correct yourself mid-sentence — “2 o'clock, no wait, 3” — and only the 3 survives. Spell an email out loud and it assembles it.</p></div></li>
+          <li><div><b>It lands where you were</b><p>Polished text, at your cursor, in whatever app you were already using.</p></div></li>
+          <li><div><b>Or it acts</b><p>If what you said was an instruction, you get a card showing exactly what will happen. Press Enter and it's done.</p></div></li>
+        </ol>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr; gap:18px">
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <h3>It sounds like you, not like an AI</h3>
+          <p>Mockingbird learns how you write from your own dictations — your phrasing, your sign-off, the way you close a message.</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <h3>It never loses your words</h3>
+          <p>Formatter down? You get the raw transcript. No field focused? It goes to your clipboard. Every failure still ends with your words somewhere.</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <h3>No recordings kept</h3>
+          <p>Your audio is transcribed and discarded — Mockingbird never stores a recording. It runs on your team's own deployment, not a shared service.</p>
+        </div>
+      </div>
+    </div>
   </div>
+</section>
 
-  <h2>Try it here first</h2>
-  <div class="card">
-    <p style="margin:0;color:var(--muted);font-size:14.5px">
-      No install needed — these run in this browser tab:
-      <a href="demo/" style="color:var(--accent)">dictation</a> ·
-      <a href="demo/crm.html" style="color:var(--accent)">voice actions</a>.
-      A microphone prompt will appear.
-    </p>
+<!-- ------------------------------------------------------------ learns -->
+<section class="tint" id="learns">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow">It gets better every week</div>
+      <h2>It learns your people, your places, your habits.</h2>
+      <p class="lede">
+        Week one it fixes filler words. Week four it spells your neighbourhoods right, knows
+        that “the Chens” means the contact in your CRM, and writes your follow-ups the way
+        you write them.
+      </p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>Your vocabulary</h3>
+        <p>Street names, brokerages, client names — the proper nouns every recognizer gets wrong, learned from your own corrections.</p>
+      </div>
+      <div class="card">
+        <h3>Your voice</h3>
+        <p>Sentence length, formality, how you open and close. The polish keeps your voice instead of flattening it.</p>
+      </div>
+      <div class="card">
+        <h3>And you can read all of it</h3>
+        <p>Everything it has picked up is on one page in the app, in plain language. Erase it in one click, or switch learning off entirely.</p>
+      </div>
+    </div>
   </div>
+</section>
 
-  <footer>
-    Something not working? Whoever set this up can check the deployment's environment variables —
-    this page says which ones are missing. Everything you dictate is processed by your own
-    deployment; no voice recordings are kept.
-  </footer>
+<!-- --------------------------------------------------------------- faq -->
+<section>
+  <div class="wrap">
+    <h2 style="margin-bottom:12px">Questions</h2>
+    <div style="max-width:840px">
+    <details><summary>How is this different from other dictation apps?</summary>
+      <p>They stop at typing. Mockingbird types just as well, and then does the thing you asked for — creating the contact, logging the call, booking the showing, setting the follow-up — in the system you actually run your business on.</p></details>
+    <details><summary>Can it do something I didn't mean?</summary>
+      <p>It shows you every action before running it, with each field filled in, and waits for you to press Enter. Anything ambiguous is treated as ordinary dictation instead — words in the wrong email are a nuisance, a record created by accident is worse.</p></details>
+    <details><summary>Which apps does it work in?</summary>
+      <p>All of them. It pastes at your cursor like a keyboard would, so anything you can type into, you can talk into — including apps that have never heard of us.</p></details>
+    <details><summary>What does it connect to?</summary>
+      <p>Follow Up Boss works out of the box. Any other product can be connected by describing its endpoints once — no code — and it becomes something you can say.</p></details>
+    <details><summary>Is my dictation private?</summary>
+      <p>It runs on your team's own deployment, not a shared service. Audio is never stored. Transcripts are kept so it can learn how you write — that's readable and erasable by you, and can be turned off.</p></details>
+    <details><summary>What do I need to install?</summary>
+      <p>One app, and about two minutes: install it, paste the address your team gives you, allow the microphone. There's a setup page with the exact steps.</p></details>
+    </div>
+  </div>
+</section>
+
+<div class="final">
+  <h2>The fastest way to run your business<br>is to say it out loud.</h2>
+  <p>Install it, talk into the next email you were about to type, and see how much of your day was typing.</p>
+  <div class="cta">
+    <a class="btn" id="dlFinal" href="#">Download for Mac</a>
+    <a class="btn ghost" href="/install">Set up an installed copy</a>
+  </div>
 </div>
+
+<footer>
+  <div class="wrap">
+    <span>Mockingbird — Thunderbird Agency</span>
+    <span class="sep"><a href="/install">Set up</a></span>
+    <a href="/demo/">Try dictation in the browser</a>
+    <a href="/demo/crm">Voice actions demo</a>
+  </div>
+</footer>
 
 <script>
 (function () {
-  // ---------------------------------------------------------------------
-  // Set these once, to wherever your team hosts the installers (a GitHub
-  // release, a shared drive, an intranet page). Left empty, the buttons say
-  // to ask an admin rather than leading people to a dead link.
-  // These point at the newest GitHub release, so they keep working after every
-  // new version — the release workflow publishes both files under these exact
-  // names. Repoint them if you host installers somewhere else.
   var DOWNLOADS = {
     mac: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-mac.dmg',
     windows: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-win.exe'
   };
-  // ---------------------------------------------------------------------
 
-  var base = location.origin + location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
-  var isMac = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
+  // Lead with the visitor's own platform.
+  var isMac = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
+  var first = isMac ? 'mac' : 'windows';
+  var second = isMac ? 'windows' : 'mac';
+  var name = { mac: 'Mac', windows: 'Windows' };
 
-  document.getElementById('deploymentUrl').textContent = base;
-  document.getElementById('dictateKey').textContent = isMac ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
-  document.getElementById('commandKey').textContent = isMac ? 'Cmd+Shift+K' : 'Ctrl+Shift+K';
+  document.getElementById('dlPrimary').href = DOWNLOADS[first];
+  document.getElementById('dlPrimaryLabel').textContent = 'Download for ' + name[first];
+  document.getElementById('dlSecondary').href = DOWNLOADS[second];
+  document.getElementById('dlSecondaryLabel').textContent = 'Download for ' + name[second];
+  var final = document.getElementById('dlFinal');
+  final.href = DOWNLOADS[first];
+  final.textContent = 'Download for ' + name[first];
 
-  document.getElementById('copyUrl').addEventListener('click', function () {
-    var button = this;
-    navigator.clipboard.writeText(base).then(function () {
-      button.textContent = 'Copied';
-      setTimeout(function () { button.textContent = 'Copy'; }, 1600);
-    }).catch(function () { button.textContent = 'Copy failed'; });
-  });
+  // Hairline under the nav once you start scrolling.
+  var nav = document.getElementById('nav');
+  var onScroll = function () { nav.classList.toggle('stuck', window.scrollY > 8); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
-  // Downloads — put the visitor's own platform first.
-  [['dlMac', 'mac'], ['dlWin', 'windows']].forEach(function (pair) {
-    var el = document.getElementById(pair[0]);
-    var href = DOWNLOADS[pair[1]];
-    if (href) {
-      el.href = href;
-    } else {
-      el.classList.add('disabled');
-      el.querySelector('span').textContent = 'Ask your admin for the installer';
-    }
-  });
-  if (isMac) document.getElementById('dlMac').parentNode.prepend(document.getElementById('dlMac'));
-  else document.getElementById('dlWin').parentNode.prepend(document.getElementById('dlWin'));
+  // The hero types itself out, the way it does when you actually speak.
+  var target = document.getElementById('typed');
+  var sentence = 'Hi Maria — great meeting you at the open house on Saturday. ' +
+    "I've attached the disclosures for 123 Main Street, and I'll call you Monday morning " +
+    'to talk through the numbers.';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Live health check — tells an operator what is missing instead of leaving
-  // the first agent to discover it.
-  function health(state, title, detail) {
-    document.getElementById('dot').className = 'dot ' + state;
-    document.getElementById('healthTitle').textContent = title;
-    document.getElementById('healthDetail').textContent = detail;
-  }
-
-  fetch(base + '/api/tools')
-    .then(function (r) { if (!r.ok) throw new Error('The deployment answered ' + r.status); return r.json(); })
-    .then(function (data) {
-      var missing = [];
-      if (!data.configured.ai) missing.push('ANTHROPIC_API_KEY');
-      if (!data.configured.transcription) missing.push('GROQ_API_KEY (or DEEPGRAM_API_KEY / OPENAI_API_KEY)');
-      if (missing.length) {
-        health('bad', 'This deployment is not finished yet',
-          'Missing environment variables: ' + missing.join(', ') + '. Add them in the Vercel project settings and redeploy.');
-        return;
+  if (reduce) {
+    target.textContent = sentence;
+  } else {
+    var i = 0;
+    var caret = document.createElement('span');
+    caret.className = 'caret';
+    var text = document.createTextNode('');
+    target.appendChild(text);
+    target.appendChild(caret);
+    var tick = function () {
+      if (i <= sentence.length) {
+        text.nodeValue = sentence.slice(0, i);
+        i++;
+        // A little variance reads more like speech arriving than a typewriter.
+        setTimeout(tick, sentence.charAt(i) === ' ' ? 34 : 20 + Math.random() * 26);
       }
-      var notes = [];
-      notes.push(data.configured.log
-        ? 'Dictation, commands, and the shared event log are all on.'
-        : 'Dictation and commands are on. No database configured, so nothing is remembered between sessions.');
-      if (data.requiresKey) notes.push('You will also need the access key your team was given.');
-      health('ok', 'This deployment is ready', notes.join(' '));
-    })
-    .catch(function (err) {
-      health('warn', 'Could not reach the API',
-        err.message + ' — if you just deployed, give it a moment and reload.');
-    });
+    };
+    setTimeout(tick, 700);
+  }
 })();
 </script>
 </body>

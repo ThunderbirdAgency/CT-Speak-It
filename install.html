@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Mockingbird — install</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #131a23; --line: #212b37;
+    --ink: #e8ecf1; --muted: #93a1b2; --accent: #6ea8fe;
+    --ok: #3fbf78; --bad: #e06c6c; --warn: #d9a521;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 100px; }
+
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; }
+  .mark {
+    width: 46px; height: 46px; border-radius: 13px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(160deg, #1e2530, #0a0e12);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 20px rgba(0,0,0,.4);
+  }
+  .mark svg { width: 24px; height: 24px; }
+  h1 { font-size: 26px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+
+  h2 { font-size: 15px; font-weight: 650; margin: 40px 0 14px; letter-spacing: .01em; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+
+  /* health */
+  .health { display: flex; align-items: flex-start; gap: 13px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; margin-top: 8px; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(63,191,120,.15); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 0 4px rgba(224,108,108,.15); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(217,165,33,.15); }
+  .health .body { flex: 1; min-width: 0; }
+  .health strong { font-weight: 600; }
+  .health .detail { color: var(--muted); font-size: 14px; margin-top: 3px; }
+
+  /* the URL to copy */
+  .url {
+    display: flex; align-items: center; gap: 10px; margin-top: 14px;
+    background: #0a0e13; border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px;
+  }
+  .url code {
+    flex: 1; min-width: 0; font: 500 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b9d2ff;
+  }
+  button.copy {
+    all: unset; cursor: pointer; flex: none; font-size: 13px; font-weight: 600; color: var(--muted);
+    padding: 5px 11px; border-radius: 7px; background: #182029; box-shadow: inset 0 0 0 1px var(--line);
+  }
+  button.copy:hover { color: var(--ink); }
+
+  /* steps */
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  ol.steps li {
+    counter-increment: s; position: relative; padding: 0 0 22px 44px;
+    border-left: 1px solid var(--line); margin-left: 13px;
+  }
+  ol.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: -13px; top: -2px;
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--panel); box-shadow: inset 0 0 0 1px var(--line);
+    font-size: 13px; font-weight: 650; color: var(--muted);
+  }
+  ol.steps b { display: block; font-weight: 600; margin-bottom: 2px; }
+  ol.steps p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  .downloads { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  a.dl {
+    flex: 1; min-width: 200px; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; display: block; transition: border-color .15s ease, transform .15s ease;
+  }
+  a.dl:hover { border-color: var(--accent); transform: translateY(-1px); }
+  a.dl.disabled { opacity: .5; pointer-events: none; }
+  a.dl b { display: block; font-weight: 600; }
+  a.dl span { color: var(--muted); font-size: 13.5px; }
+
+  kbd {
+    font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 7px;
+    border-radius: 6px; background: #182029; box-shadow: inset 0 0 0 1px var(--line); color: #cfe0ff;
+  }
+  .say { color: var(--muted); font-style: italic; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 20px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#e8ecf1" stroke-width="2" stroke-linecap="round">
+        <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
+        <path d="M18 11a6 6 0 0 1-12 0"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Set up Mockingbird</h1>
+      <p>Everything you need to get it running — <a href="/" style="color:var(--accent)">back to the overview</a></p>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="health">
+      <span class="dot" id="dot"></span>
+      <div class="body">
+        <strong id="healthTitle">Checking this deployment…</strong>
+        <div class="detail" id="healthDetail">One moment.</div>
+      </div>
+    </div>
+    <div class="url">
+      <code id="deploymentUrl">…</code>
+      <button class="copy" id="copyUrl">Copy</button>
+    </div>
+    <div class="detail" style="color:var(--muted);font-size:13.5px;margin-top:9px">
+      This is the address Mockingbird asks for when it first opens. Copy it now — you'll paste it in step 2.
+    </div>
+  </div>
+
+  <h2>Get the app</h2>
+  <div class="downloads">
+    <a class="dl" id="dlMac" href="#"><b>Download for Mac</b><span>Apple silicon &amp; Intel · one file for both</span></a>
+    <a class="dl" id="dlWin" href="#"><b>Download for Windows</b><span>10 and 11 · installer</span></a>
+  </div>
+
+  <h2>Set it up — about a minute</h2>
+  <ol class="steps">
+    <li>
+      <b>Install it</b>
+      <p>Mac: open the .dmg and drag Mockingbird to Applications. The first time, right-click it and choose Open.<br>
+         Windows: run the installer and click through the SmartScreen warning.</p>
+    </li>
+    <li>
+      <b>Paste the address above, and your name</b>
+      <p>Mockingbird opens asking for two things. That's the whole setup — press Save.</p>
+    </li>
+    <li>
+      <b>Allow the microphone</b>
+      <p>It asks the first time you speak. On a Mac, also switch Mockingbird on under
+         System Settings → Privacy &amp; Security → Accessibility, so text pastes itself.
+         Until you do, your words wait on the clipboard and you press Cmd+V.</p>
+    </li>
+  </ol>
+
+  <h2>Using it</h2>
+  <div class="card">
+    <p style="margin:0 0 14px"><kbd id="dictateKey">Ctrl+Shift+Space</kbd> &nbsp;<b>Dictate.</b>
+      Put your cursor anywhere — an email, a text box, a CRM field — press it, talk, press it again.
+      Your words land polished. Escape cancels.</p>
+    <p style="margin:0"><kbd id="commandKey">Ctrl+Shift+K</kbd> &nbsp;<b>Tell it to do something.</b>
+      <span class="say">“Add Maria Lopez, 555-0142, from the open house, and remind me to call her Monday.”</span>
+      It shows you exactly what it's about to do — press <kbd>Enter</kbd> and it's done.
+      Nothing gets written until you press it.</p>
+  </div>
+
+  <h2>Try it here first</h2>
+  <div class="card">
+    <p style="margin:0;color:var(--muted);font-size:14.5px">
+      No install needed — these run in this browser tab:
+      <a href="/demo/" style="color:var(--accent)">dictation</a> ·
+      <a href="/demo/crm" style="color:var(--accent)">voice actions</a>.
+      A microphone prompt will appear.
+    </p>
+  </div>
+
+  <footer>
+    Something not working? Whoever set this up can check the deployment's environment variables —
+    this page says which ones are missing. Everything you dictate is processed by your own
+    deployment; no voice recordings are kept.
+  </footer>
+</div>
+
+<script>
+(function () {
+  // ---------------------------------------------------------------------
+  // Set these once, to wherever your team hosts the installers (a GitHub
+  // release, a shared drive, an intranet page). Left empty, the buttons say
+  // to ask an admin rather than leading people to a dead link.
+  // These point at the newest GitHub release, so they keep working after every
+  // new version — the release workflow publishes both files under these exact
+  // names. Repoint them if you host installers somewhere else.
+  var DOWNLOADS = {
+    mac: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-mac.dmg',
+    windows: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-win.exe'
+  };
+  // ---------------------------------------------------------------------
+
+  var base = location.origin + location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+  var isMac = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
+
+  document.getElementById('deploymentUrl').textContent = base;
+  document.getElementById('dictateKey').textContent = isMac ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space';
+  document.getElementById('commandKey').textContent = isMac ? 'Cmd+Shift+K' : 'Ctrl+Shift+K';
+
+  document.getElementById('copyUrl').addEventListener('click', function () {
+    var button = this;
+    navigator.clipboard.writeText(base).then(function () {
+      button.textContent = 'Copied';
+      setTimeout(function () { button.textContent = 'Copy'; }, 1600);
+    }).catch(function () { button.textContent = 'Copy failed'; });
+  });
+
+  // Downloads — put the visitor's own platform first.
+  [['dlMac', 'mac'], ['dlWin', 'windows']].forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    var href = DOWNLOADS[pair[1]];
+    if (href) {
+      el.href = href;
+    } else {
+      el.classList.add('disabled');
+      el.querySelector('span').textContent = 'Ask your admin for the installer';
+    }
+  });
+  if (isMac) document.getElementById('dlMac').parentNode.prepend(document.getElementById('dlMac'));
+  else document.getElementById('dlWin').parentNode.prepend(document.getElementById('dlWin'));
+
+  // Live health check — tells an operator what is missing instead of leaving
+  // the first agent to discover it.
+  function health(state, title, detail) {
+    document.getElementById('dot').className = 'dot ' + state;
+    document.getElementById('healthTitle').textContent = title;
+    document.getElementById('healthDetail').textContent = detail;
+  }
+
+  fetch(base + '/api/tools')
+    .then(function (r) { if (!r.ok) throw new Error('The deployment answered ' + r.status); return r.json(); })
+    .then(function (data) {
+      var missing = [];
+      if (!data.configured.ai) missing.push('ANTHROPIC_API_KEY');
+      if (!data.configured.transcription) missing.push('GROQ_API_KEY (or DEEPGRAM_API_KEY / OPENAI_API_KEY)');
+      if (missing.length) {
+        health('bad', 'This deployment is not finished yet',
+          'Missing environment variables: ' + missing.join(', ') + '. Add them in the Vercel project settings and redeploy.');
+        return;
+      }
+      var notes = [];
+      notes.push(data.configured.log
+        ? 'Dictation, commands, and the shared event log are all on.'
+        : 'Dictation and commands are on. No database configured, so nothing is remembered between sessions.');
+      if (data.requiresKey) notes.push('You will also need the access key your team was given.');
+      health('ok', 'This deployment is ready', notes.join(' '));
+    })
+    .catch(function (err) {
+      health('warn', 'Could not reach the API',
+        err.message + ' — if you just deployed, give it a moment and reload.');
+    });
+})();
+</script>
+</body>
+</html>

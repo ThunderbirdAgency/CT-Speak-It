@@ -40,8 +40,9 @@ curl https://your-deployment.vercel.app/api/tools
 ```
 
 Anything `false` in `configured` is a missing environment variable. The
-deployment's own front page says the same thing in plain language — open it in
-a browser and it checks itself.
+deployment's own setup page (`/install`) says the same thing in plain language —
+open it in a browser and it checks itself. The root URL is the overview page you
+send to agents.
 
 ### A word about who can reach your deployment
 
