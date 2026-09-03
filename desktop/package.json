@@ -33,8 +33,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "universal"
           ]
         }
       ],
@@ -46,11 +45,13 @@
         "NSMicrophoneUsageDescription": "Mockingbird uses the microphone so you can dictate instead of typing.",
         "NSAppleEventsUsageDescription": "Mockingbird sends a paste keystroke so dictated text lands where your cursor is.",
         "LSUIElement": true
-      }
+      },
+      "artifactName": "Mockingbird-mac.${ext}"
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "artifactName": "Mockingbird-win.${ext}"
     },
     "nsis": {
       "oneClick": false,

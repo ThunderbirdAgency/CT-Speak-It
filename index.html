@@ -129,7 +129,7 @@
 
   <h2>Get the app</h2>
   <div class="downloads">
-    <a class="dl" id="dlMac" href="#"><b>Download for Mac</b><span>Apple silicon &amp; Intel · .dmg</span></a>
+    <a class="dl" id="dlMac" href="#"><b>Download for Mac</b><span>Apple silicon &amp; Intel · one file for both</span></a>
     <a class="dl" id="dlWin" href="#"><b>Download for Windows</b><span>10 and 11 · installer</span></a>
   </div>
 
@@ -186,9 +186,12 @@
   // Set these once, to wherever your team hosts the installers (a GitHub
   // release, a shared drive, an intranet page). Left empty, the buttons say
   // to ask an admin rather than leading people to a dead link.
+  // These point at the newest GitHub release, so they keep working after every
+  // new version — the release workflow publishes both files under these exact
+  // names. Repoint them if you host installers somewhere else.
   var DOWNLOADS = {
-    mac: '',
-    windows: ''
+    mac: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-mac.dmg',
+    windows: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-win.exe'
   };
   // ---------------------------------------------------------------------
 

@@ -84,12 +84,24 @@ the whole thing can be switched off. Details: `docs/LEARNING.md`.
 
 ## Building installers
 
+Push a tag and GitHub builds both for you — no need for a Mac *and* a PC:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The workflow attaches `Mockingbird-mac.dmg` (universal — one file for Apple
+silicon and Intel) and `Mockingbird-win.exe` to the release. Those filenames are
+fixed, so the deployment's install page can link to them permanently.
+
+Locally, if you have the right machine:
+
 ```bash
 cd desktop
 npm install
 npm run icons      # only after editing tools/make-icons.js
-npm run dist:mac   # → dist/Mockingbird-1.0.0.dmg     (run on a Mac)
-npm run dist:win   # → dist/Mockingbird Setup 1.0.0.exe (run on Windows)
+npm run dist:mac   # → dist/Mockingbird-mac.dmg  (run on a Mac)
+npm run dist:win   # → dist/Mockingbird-win.exe  (run on Windows)
 ```
 
 Unsigned builds are fine internally: Mac users right-click → Open the first
