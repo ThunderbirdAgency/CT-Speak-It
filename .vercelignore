@@ -1,0 +1,10 @@
+# Deploying this repo serves its files at the deployment URL. Only the widget,
+# the API, the demos, and the install page belong there — everything else is
+# for people working on Mockingbird, not for the internet.
+desktop/
+test/
+docs/
+db/
+.github/
+node_modules/
+README.md
