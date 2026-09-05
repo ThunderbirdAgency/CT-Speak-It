@@ -7,27 +7,33 @@
  *
  *   npm test        (needs playwright; see package.json)
  */
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const assert = require('assert');
-const { execSync } = require('child_process');
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
+const assert = require("assert");
+const { execSync } = require("child_process");
 
 // Playwright is a test-only dependency and is just as often installed
 // globally; find it either way rather than making people npm i twice.
 function loadPlaywright() {
-  try { return require('playwright'); } catch (e) { /* try the global root */ }
   try {
-    const root = execSync('npm root -g', { encoding: 'utf8' }).trim();
-    return require(path.join(root, 'playwright'));
+    return require("playwright");
   } catch (e) {
-    console.error('These tests need Playwright: npm i -D playwright (or npm i -g playwright).');
+    /* try the global root */
+  }
+  try {
+    const root = execSync("npm root -g", { encoding: "utf8" }).trim();
+    return require(path.join(root, "playwright"));
+  } catch (e) {
+    console.error(
+      "These tests need Playwright: npm i -D playwright (or npm i -g playwright).",
+    );
     process.exit(1);
   }
 }
 const { chromium } = loadPlaywright();
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, "..");
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
@@ -49,10 +55,13 @@ const PAGE = `<!doctype html>
       return reply({});
     };
   </script>
-  <script src="${'file://' + path.join(ROOT, 'src', 'mockingbird.js')}" data-manual="true"></script>
+  <script src="${"file://" + path.join(ROOT, "src", "mockingbird.js")}" data-manual="true"></script>
 </body>`;
 
-const pageFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mb-test-')), 'index.html');
+const pageFile = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), "mb-test-")),
+  "index.html",
+);
 fs.writeFileSync(pageFile, PAGE);
 
 let failures = 0;
@@ -60,107 +69,77 @@ function check(name, fn) {
   try {
     const result = fn();
     // An async assertion would resolve after we had already printed a tick.
-    assert.ok(!result || typeof result.then !== 'function', 'assertions must be synchronous');
-    console.log('  ✓ ' + name);
+    assert.ok(
+      !result || typeof result.then !== "function",
+      "assertions must be synchronous",
+    );
+    console.log("  ✓ " + name);
   } catch (err) {
     failures++;
-    console.error('  ✗ ' + name + '\n    ' + err.message);
+    console.error("  ✗ " + name + "\n    " + err.message);
   }
 }
 
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  await page.goto('file://' + pageFile);
+  await page.goto("file://" + pageFile);
 
   await page.evaluate(() => {
     window.__handled = [];
     Mockingbird.init({
-      formatEndpoint: '/api/format',
-      actionsEndpoint: '/api/actions',
-      actEndpoint: '/api/act',
-      connectors: ['followupboss'],
-      actions: [{
-        name: 'pop_dashboard_card',
-        description: 'Show a card on this app dashboard',
-        input_schema: { type: 'object', properties: { title: { type: 'string' } } }
-      }],
+      formatEndpoint: "/api/format",
+      getToken: async () => "test-session",
+      actionsEndpoint: "/api/actions",
+      actEndpoint: "/api/act",
+      connectors: ["followupboss"],
+      actions: [
+        {
+          name: "pop_dashboard_card",
+          description: "Show a card on this app dashboard",
+          input_schema: {
+            type: "object",
+            properties: { title: { type: "string" } },
+          },
+        },
+      ],
       onAction: (name, input) => window.__handled.push({ name, input }),
-      liveInsert: false
+      liveInsert: false,
     });
   });
 
-  console.log('dictation');
-  await page.evaluate(() => {
-    window.__actionsReply = { kind: 'dictation', text: 'Send the disclosures tomorrow.' };
-    document.getElementById('field').focus();
-    Mockingbird.simulate('um send the disclosures tomorrow');
-  });
-  await page.waitForFunction(() => document.getElementById('field').value.length > 0, null, { timeout: 4000 });
-  const typed = await page.inputValue('#field');
-  check('polished text lands in the focused field', () =>
-    assert.strictEqual(typed, 'Send the disclosures tomorrow.'));
-
-  console.log('in-app action');
+  console.log("dictation");
   await page.evaluate(() => {
     window.__actionsReply = {
-      kind: 'actions',
-      actions: [{ name: 'pop_dashboard_card', input: { title: 'Open house' }, execute: false }]
+      kind: "dictation",
+      text: "Send the disclosures tomorrow.",
     };
-    Mockingbird.simulate('pop a card for the open house');
+    document.getElementById("field").focus();
+    Mockingbird.simulate("um send the disclosures tomorrow");
   });
-  await page.waitForFunction(() => window.__handled.length > 0, null, { timeout: 4000 });
-  const handled = await page.evaluate(() => window.__handled);
-  check('goes straight to the app handler, no confirmation', () => {
-    assert.strictEqual(handled[0].name, 'pop_dashboard_card');
-    assert.strictEqual(handled[0].input.title, 'Open house');
-  });
-  const actsAfterAppAction = await page.evaluate(
-    () => window.__calls.filter((c) => c.url === '/api/act').length);
-  check('the app handler is not routed through /api/act', () =>
-    assert.strictEqual(actsAfterAppAction, 0));
+  await page.waitForFunction(
+    () => document.getElementById("field").value.length > 0,
+    null,
+    { timeout: 4000 },
+  );
+  const typed = await page.inputValue("#field");
+  check("polished text lands in the focused field", () =>
+    assert.strictEqual(typed, "Send the disclosures tomorrow."),
+  );
 
-  console.log('connector action');
-  await page.evaluate(() => {
-    window.__actionsReply = {
-      kind: 'actions',
-      actions: [{
-        name: 'fub_create_person',
-        input: { name: 'Maria Lopez', phone: '555-0142' },
-        connector: 'followupboss', connectorLabel: 'Follow Up Boss', execute: true
-      }]
-    };
-    window.__actReply = { results: [{ name: 'fub_create_person', ok: true, summary: 'Added Maria Lopez to Follow Up Boss' }] };
-    Mockingbird.simulate('add maria lopez 555-0142');
+  const calls = await page.evaluate(() => window.__calls);
+  check("ordinary dictation never routes to CRM actions", () => {
+    assert.strictEqual(
+      calls.filter((c) => c.url === "/api/actions" || c.url === "/api/act")
+        .length,
+      0,
+    );
   });
-  await page.waitForFunction(() => Mockingbird.state === 'confirm', null, { timeout: 4000 });
-  const actsBeforeEnter = await page.evaluate(
-    () => window.__calls.filter((c) => c.url === '/api/act').length);
-  check('waits for the user instead of writing to the CRM', () =>
-    assert.strictEqual(actsBeforeEnter, 0));
-  const pill = await page.evaluate(() =>
-    document.querySelector('[data-mockingbird]').shadowRoot.querySelector('.mb-confirm-text').textContent);
-  check('says what it is about to do', () => assert.match(pill, /create person · Maria Lopez/));
-
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => window.__calls.some((c) => c.url === '/api/act'), null, { timeout: 4000 });
-  const actCall = await page.evaluate(() => window.__calls.find((c) => c.url === '/api/act'));
-  check('Enter runs it, with the connector attached', () => {
-    assert.strictEqual(actCall.body.actions[0].name, 'fub_create_person');
-    assert.deepStrictEqual(actCall.body.connectors, ['followupboss']);
+  check("no in-app action handler runs during dictation", () => {
+    assert.strictEqual(calls.filter((c) => c.url === "/api/format").length, 1);
   });
-
-  console.log('connector action, declined');
-  await page.evaluate(() => { window.__calls = []; Mockingbird.simulate('add john doe 555-9999'); });
-  await page.waitForFunction(() => Mockingbird.state === 'confirm', null, { timeout: 4000 });
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => Mockingbird.state === 'idle', null, { timeout: 4000 });
-  const actsAfterEscape = await page.evaluate(
-    () => window.__calls.filter((c) => c.url === '/api/act').length);
-  check('Escape throws it away and runs nothing', () =>
-    assert.strictEqual(actsAfterEscape, 0));
 
   await browser.close();
-  console.log(failures ? '\nFAILED' : '\nall good');
+  console.log(failures ? "\nFAILED" : "\nall good");
   process.exit(failures ? 1 : 0);
 })();

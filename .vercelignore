@@ -8,3 +8,7 @@ db/
 .github/
 node_modules/
 README.md
+
+tools/
+.env*
+demo/

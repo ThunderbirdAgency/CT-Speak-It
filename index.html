@@ -1,527 +1,234 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mockingbird — talk instead of type, and it does the rest</title>
-<meta name="description" content="Mockingbird turns your voice into polished text anywhere on your Mac or PC — then goes further than dictation ever has. Say what you want done and it happens, in Follow Up Boss or whatever you run your business on.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --ink: #0d1117;
-    --ink-2: #3d4855;
-    --muted: #6b7787;
-    --line: #e6e9ee;
-    --bg: #ffffff;
-    --bg-2: #f7f8fa;
-    --accent: #4f46e5;
-    --accent-2: #7c6cf0;
-    --ok: #16a34a;
-    --radius: 18px;
-    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 12px 32px -8px rgba(16,24,40,.10);
-    --shadow-lg: 0 2px 4px rgba(16,24,40,.04), 0 30px 70px -18px rgba(16,24,40,.22);
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 400 17px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased; letter-spacing: -.011em;
-  }
-  a { color: inherit; text-decoration: none; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-
-  h1, h2, h3 { letter-spacing: -.032em; line-height: 1.08; margin: 0; font-weight: 700; }
-  h1 { font-size: clamp(40px, 6.2vw, 68px); font-weight: 800; }
-  h2 { font-size: clamp(30px, 4.2vw, 44px); }
-  h3 { font-size: 19px; letter-spacing: -.018em; line-height: 1.3; }
-  p { margin: 0; }
-  .lede { font-size: clamp(17px, 2.1vw, 21px); color: var(--ink-2); line-height: 1.55; }
-  .eyebrow {
-    font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--accent); margin-bottom: 14px;
-  }
-
-  /* ---------------------------------------------------------------- nav */
-  nav {
-    position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.82);
-    -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
-    border-bottom: 1px solid transparent; transition: border-color .2s ease;
-  }
-  nav.stuck { border-bottom-color: var(--line); }
-  nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
-  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.02em; font-size: 17px; }
-  .logo .mk {
-    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none;
-    background: linear-gradient(160deg, #232c38, #0b0f14);
-    box-shadow: 0 2px 8px rgba(16,24,40,.24);
-  }
-  .logo .mk svg { width: 16px; height: 16px; }
-  nav .links { display: flex; gap: 26px; margin-left: auto; font-size: 15px; color: var(--ink-2); font-weight: 500; }
-  nav .links a:hover { color: var(--ink); }
-  @media (max-width: 780px) { nav .links { display: none; } }
-
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-    padding: 13px 22px; border-radius: 12px; font-size: 15.5px; font-weight: 600;
-    background: var(--ink); color: #fff; border: 1px solid var(--ink);
-    transition: transform .16s cubic-bezier(.2,1.3,.4,1), box-shadow .16s ease, background .16s ease;
-    white-space: nowrap;
-  }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px -6px rgba(16,24,40,.35); }
-  .btn.ghost { background: #fff; color: var(--ink); border-color: var(--line); }
-  .btn.ghost:hover { border-color: #c9cfd8; box-shadow: 0 8px 22px -10px rgba(16,24,40,.2); }
-  .btn.sm { padding: 9px 16px; font-size: 14.5px; border-radius: 10px; }
-  .btn svg { width: 17px; height: 17px; }
-
-  /* --------------------------------------------------------------- hero */
-  .hero { padding: 76px 0 0; position: relative; overflow: hidden; isolation: isolate; }
-  .hero .wrap { position: relative; z-index: 1; }
-  /* The glow sits inside the hero's own box — pulled above it, the bright
-     centre was being clipped by overflow:hidden and only the faint tail showed. */
-  .hero::before {
-    content: ''; position: absolute; inset: 0 0 auto; height: 760px; z-index: 0;
-    background:
-      radial-gradient(900px 420px at 42% 6%, rgba(124,108,240,.22), transparent 66%),
-      radial-gradient(620px 340px at 88% 2%, rgba(79,70,229,.16), transparent 68%),
-      radial-gradient(520px 300px at 8% 26%, rgba(167,139,250,.13), transparent 70%);
-  }
-  .hero-inner { max-width: 780px; }
-  .hero h1 span { background: linear-gradient(94deg, var(--accent), #a78bfa 60%, #6366f1); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .hero .lede { margin-top: 22px; max-width: 640px; }
-  .cta { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; align-items: center; }
-  .cta .note { font-size: 14px; color: var(--muted); }
-
-  /* ------------------------------------------------------------ mockups */
-  .screen {
-    background: #0d1117; border-radius: 16px; box-shadow: var(--shadow-lg);
-    overflow: hidden; border: 1px solid rgba(255,255,255,.07);
-  }
-  .screen .bar {
-    height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 15px;
-    background: #161d27; border-bottom: 1px solid rgba(255,255,255,.06);
-  }
-  .screen .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2c3644; display: block; }
-  .screen .bar .title {
-    margin-left: 12px; font-size: 12.5px; color: #7d8899; font-weight: 500;
-  }
-  .screen .body { padding: 26px 26px 30px; position: relative; min-height: 250px; }
-
-  .mail-field { font-size: 14px; color: #6d7889; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-  .mail-field b { color: #aab5c4; font-weight: 500; }
-  .mail-text { color: #dbe3ec; font-size: 15px; line-height: 1.65; padding-top: 18px; min-height: 76px; }
-  .caret { display: inline-block; width: 2px; height: 17px; background: #7c6cf0; vertical-align: -3px; margin-left: 1px; animation: blink 1.05s step-end infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-
-  /* the overlay pill / card, same design language as the real app */
-  .pill {
-    position: absolute; right: 22px; bottom: 22px; width: min(330px, calc(100% - 44px));
-    background: rgba(18,24,32,.97); border-radius: 15px; color: #e8ecf1;
-    box-shadow: 0 12px 34px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08);
-    font-size: 13px; overflow: hidden;
-  }
-  .pill .row { display: flex; align-items: center; gap: 11px; padding: 13px 15px; }
-  .pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #e04545; flex: none; animation: pulse 1.5s ease infinite; }
-  .pill.blue .dot { background: #6ea8fe; animation: none; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.35); opacity: .55 } }
-  .bars { display: inline-flex; gap: 3px; align-items: center; height: 18px; flex: none; }
-  .bars i { width: 3px; border-radius: 2px; background: #ff9d94; height: 5px; animation: eq .9s ease-in-out infinite; }
-  .bars i:nth-child(2) { animation-delay: .1s } .bars i:nth-child(3) { animation-delay: .22s }
-  .bars i:nth-child(4) { animation-delay: .34s } .bars i:nth-child(5) { animation-delay: .46s }
-  @keyframes eq { 0%,100% { height: 5px } 50% { height: 15px } }
-  .pill .label { flex: 1; min-width: 0; color: rgba(232,236,241,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill .action { border-top: 1px solid rgba(255,255,255,.07); padding: 12px 15px; }
-  .pill .action .t { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
-  .pill .action .where { font-size: 10.5px; font-weight: 500; padding: 2px 7px; border-radius: 99px; background: rgba(110,168,254,.16); color: #a9caff; }
-  .pill .fields { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin-top: 7px; font-size: 12px; }
-  .pill .fields dt { color: rgba(232,236,241,.5); }
-  .pill .fields dd { margin: 0; color: #dbe3ec; }
-  .pill .foot {
-    display: flex; justify-content: space-between; align-items: center; gap: 10px;
-    padding: 9px 15px; border-top: 1px solid rgba(255,255,255,.07);
-    background: rgba(255,255,255,.02); font-size: 11.5px; color: rgba(232,236,241,.55);
-  }
-  .k { padding: 1.5px 6px; border-radius: 5px; background: rgba(255,255,255,.1); font-weight: 600; color: #cfe0ff; }
-
-  .hero-shot { margin-top: 54px; position: relative; }
-  .hero-shot .screen { max-width: 900px; margin: 0 auto; }
-
-  /* ------------------------------------------------------------ sections */
-  section { padding: 92px 0; }
-  section.tint { background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .head { max-width: 700px; margin-bottom: 46px; }
-  .head p { margin-top: 16px; }
-
-  .apps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
-  .apps span {
-    font-size: 14px; font-weight: 500; color: var(--ink-2);
-    padding: 8px 15px; border-radius: 99px; background: #fff; border: 1px solid var(--line);
-  }
-
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
-  @media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 40px; } }
-
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
-  .card {
-    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 26px 24px; box-shadow: var(--shadow);
-  }
-  .card .ic {
-    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 16px;
-    background: linear-gradient(160deg, #f0efff, #e6e9ff); color: var(--accent);
-  }
-  .card .ic svg { width: 19px; height: 19px; }
-  .card h3 { margin-bottom: 8px; }
-  .card p { color: var(--muted); font-size: 15.5px; line-height: 1.55; }
-
-  .say {
-    font-size: clamp(20px, 2.6vw, 27px); line-height: 1.4; font-weight: 500;
-    color: var(--ink); letter-spacing: -.022em;
-  }
-  .say .q { color: var(--accent); }
-
-  ol.flow { list-style: none; padding: 0; margin: 0; counter-reset: f; display: grid; gap: 4px; }
-  ol.flow li { counter-increment: f; display: flex; gap: 16px; padding: 16px 0; }
-  ol.flow li::before {
-    content: counter(f); flex: none; width: 28px; height: 28px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 13.5px; font-weight: 700;
-    background: var(--ink); color: #fff;
-  }
-  ol.flow b { display: block; font-weight: 600; margin-bottom: 3px; }
-  ol.flow p { color: var(--muted); font-size: 15.5px; }
-
-  details {
-    border-bottom: 1px solid var(--line); padding: 20px 0;
-  }
-  details summary {
-    cursor: pointer; font-weight: 600; font-size: 17px; list-style: none;
-    display: flex; justify-content: space-between; align-items: center; gap: 20px;
-  }
-  details summary::-webkit-details-marker { display: none; }
-  details summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 22px; line-height: 1; }
-  details[open] summary::after { content: '−'; }
-  details p { color: var(--muted); font-size: 16px; margin-top: 12px; max-width: 68ch; }
-
-  .final {
-    text-align: center; padding: 96px 24px;
-    background: linear-gradient(168deg, #10151c, #0b0f14);
-    color: #fff; border-radius: 26px; margin: 0 auto 96px; max-width: 1032px;
-  }
-  .final h2 { color: #fff; }
-  .final p { color: rgba(255,255,255,.62); margin: 18px auto 0; max-width: 500px; }
-  .final .cta { justify-content: center; }
-  .final .btn { background: #fff; color: var(--ink); border-color: #fff; }
-  .final .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.25); }
-
-  footer { border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--muted); font-size: 14.5px; }
-  footer .wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-  footer a { color: var(--ink-2); }
-  footer a:hover { color: var(--ink); }
-  footer .sep { margin-left: auto; }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
-    html { scroll-behavior: auto; }
-  }
-</style>
-</head>
-<body>
-
-<nav id="nav">
-  <div class="wrap">
-    <a class="logo" href="/">
-      <span class="mk">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
-          <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
-          <path d="M18 11a6 6 0 0 1-12 0"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </span>
-      Mockingbird
-    </a>
-    <div class="links">
-      <a href="#how">How it works</a>
-      <a href="#actions">Taking action</a>
-      <a href="#learns">What it learns</a>
-      <a href="/install">Set up</a>
-    </div>
-    <a class="btn sm" href="#download">Download</a>
-  </div>
-</nav>
-
-<!-- ---------------------------------------------------------------- hero -->
-<header class="hero">
-  <div class="wrap">
-    <div class="hero-inner">
-      <h1>Talk instead of type.<br><span>Then it does the rest.</span></h1>
-      <p class="lede">
-        Hold one key anywhere on your Mac or PC and say it out loud — clean, professional
-        text lands where your cursor is. Then Mockingbird goes further than dictation ever
-        has: tell it what you want done, and it does it, in your CRM.
-      </p>
-      <div class="cta" id="download">
-        <a class="btn" id="dlPrimary" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="dlPrimaryLabel">Download for Mac</span></a>
-        <a class="btn ghost" id="dlSecondary" href="#"><span id="dlSecondaryLabel">Download for Windows</span></a>
-        <span class="note">Mac and Windows · about two minutes to set up</span>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mockingbird — your voice, less typing.</title>
+    <meta
+      name="description"
+      content="Turn your words into clear writing. Mockingbird by Thunderbird brings dictation, rewrites and saved responses to your workday."
+    />
+    <link rel="stylesheet" href="/web/site.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="/" aria-label="Mockingbird home"
+          ><span aria-hidden="true">🐦</span>Mockingbird</a
+        >
+        <nav aria-label="Main">
+          <a class="desktop-link" href="#how">How it works</a
+          ><a href="#pricing">Pro</a
+          ><a href="/account" class="button small">My account ↗</a>
+        </nav>
       </div>
-    </div>
-
-    <div class="hero-shot">
-      <div class="screen">
-        <div class="bar"><i></i><i></i><i></i><span class="title">New message</span></div>
-        <div class="body">
-          <div class="mail-field"><b>To:</b> maria.lopez@example.com</div>
-          <div class="mail-field"><b>Subject:</b> 123 Main Street — following up</div>
-          <div class="mail-text" id="typed"></div>
-          <div class="pill">
+    </header>
+    <main>
+      <div class="wrap hero">
+        <div>
+          <div class="eyebrow">A little bird. A lot less typing.</div>
+          <h1>
+            Your words.<br />Your voice.<br /><em>Without the typing.</em>
+          </h1>
+          <p class="lede">
+            Emails, follow-ups, listing descriptions, and the thought you don’t
+            want to lose. Say it out loud. Let Mockingbird handle the words.
+          </p>
+          <div class="actions">
+            <a class="button" href="/install">Get Mockingbird ↗</a
+            ><a class="button secondary" href="/account#gift"
+              >I have a gift code</a
+            >
+          </div>
+          <p class="fine">
+            From Thunderbird · Built with real estate agents in mind
+          </p>
+        </div>
+        <div class="demo" aria-label="Example of dictation cleanup">
+          <div class="demo-top">
+            <span>Less “um.” More you.</span><span>Example</span>
+          </div>
+          <p class="said">
+            “Hey Jordan, um, thanks for coming by the open house. Let’s talk
+            Tuesday—actually, Wednesday.”
+          </p>
+          <div class="result">
+            <span class="eyebrow">Ready to send</span>
+            <p>
+              Hey Jordan, thanks for coming by the open house. Let’s talk
+              Wednesday.
+            </p>
+          </div>
+          <div class="keys">
+            <span class="status-dot"></span><kbd>⌘ / Ctrl + Shift + Space</kbd
+            ><span>Speak. Press again.</span>
+          </div>
+        </div>
+      </div>
+      <section class="section" id="how">
+        <div class="wrap">
+          <div class="eyebrow">Make room for the actual work</div>
+          <h2>Less time at the keyboard.<br />More time being you.</h2>
+          <div class="grid3">
+            <article class="card">
+              <span class="number">01 / SAY IT</span>
+              <h3>A shortcut to your thoughts.</h3>
+              <p>
+                Put your cursor in a text field, press your shortcut, and speak.
+                Press again to finish. Mockingbird cleans up the transcript and
+                sends a paste.
+              </p>
+            </article>
+            <article class="card">
+              <span class="number">02 / SHAPE IT</span>
+              <h3>“Make that friendlier.”</h3>
+              <p>
+                Select text, use the rewrite shortcut, and tell your bird what
+                to change. Review the result before replacing your original.
+              </p>
+            </article>
+            <article class="card">
+              <span class="number">03 / MAKE IT YOURS</span>
+              <h3>Your words, remembered.</h3>
+              <p>
+                Teach it the names you use, your writing style, and saved
+                responses. Say “insert showing follow-up” to bring back your own
+                words.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="wrap banner">
+          <div>
+            <div class="eyebrow">A helpful memory. On your terms.</div>
+            <h2>
+              It should know your style.<br />You should know what it knows.
+            </h2>
+            <p>
+              Optional memory is visible and editable. Writing samples become
+              suggestions for your review. Mockingbird’s server doesn’t keep a
+              transcript archive.
+            </p>
+            <a class="button secondary" style="color: white" href="/privacy"
+              >How your words are handled ↗</a
+            >
+          </div>
+          <div>
+            <h3>“Warm. Direct. Skip the sales pitch.”</h3>
+            <p>
+              A useful writing preference. Save it, change it, or erase it
+              whenever you like.
+            </p>
+            <p class="fine">
+              Audio and text are processed by service providers to deliver
+              dictation and rewrites. See the privacy page for details.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section class="section" id="pricing">
+        <div class="wrap grid2">
+          <div>
+            <div class="eyebrow">Small price. Everyday value.</div>
+            <h2>Meet Mockingbird Pro.</h2>
+            <p class="lede">
+              One membership for your everyday voice work. If Thunderbird gave
+              you a code, your access is our gift.
+            </p>
+            <p>
+              Gift access unlocks the same Pro features. No card. No surprise
+              subscription when your gift ends.
+            </p>
+          </div>
+          <div class="card">
             <div class="row">
-              <span class="dot"></span>
-              <span class="bars"><i></i><i></i><i></i><i></i><i></i></span>
-              <span class="label">Listening… press again to finish</span>
+              <h3>Mockingbird Pro</h3>
+              <span class="badge">Paid or gifted. Same bird.</span>
             </div>
+            <div class="price">$15 <small>USD / month</small></div>
+            <ul class="checklist">
+              <li>Desktop dictation and voice rewrites</li>
+              <li>Web dictation workspace, including mobile browsers</li>
+              <li>Personal vocabulary and optional writing memory</li>
+              <li>Up to 100 spoken saved responses</li>
+              <li>240 recordings and 500 text requests per day</li>
+            </ul>
+            <div class="actions">
+              <a href="/account" class="button">Activate Pro ↗</a
+              ><a href="/account#gift" class="button secondary"
+                >Redeem a gift</a
+              >
+            </div>
+            <p class="fine">
+              Paid membership renews monthly until cancelled. Availability and
+              gift expiry are shown in your account. Native mobile keyboards are
+              not included in this release.
+            </p>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</header>
-
-<!-- --------------------------------------------------------- everywhere -->
-<section>
-  <div class="wrap">
-    <div class="head">
-      <div class="eyebrow">Everywhere you already work</div>
-      <h2>If it has a cursor, you can talk to it.</h2>
-      <p class="lede">
-        Mockingbird isn't a text box you paste out of. It lives in your menu bar and follows
-        you into every application on the machine — no integration, no plugin, nothing for
-        the other app to support.
-      </p>
-      <div class="apps">
-        <span>Gmail</span><span>Outlook</span><span>Slack</span><span>Word</span>
-        <span>Google Docs</span><span>iMessage</span><span>Notion</span><span>Salesforce</span>
-        <span>Follow Up Boss</span><span>your CRM</span><span>…anything else</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ------------------------------------------------------------- actions -->
-<section class="tint" id="actions">
-  <div class="wrap">
-    <div class="split">
-      <div>
-        <div class="eyebrow">The part dictation can't do</div>
-        <h2>Say what you want done. Press Enter.</h2>
-        <p class="lede" style="margin-top:18px">
-          Every other dictation app stops at typing. Mockingbird keeps going: it understands
-          what you asked for, shows you exactly what it's about to do, and waits.
-        </p>
-        <p class="say" style="margin-top:28px">
-          <span class="q">“</span>Add Maria Lopez, 555-0142, from the open house at 123 Main,
-          and remind me to call her Monday.<span class="q">”</span>
-        </p>
-        <p class="lede" style="margin-top:24px; font-size:17px">
-          Two records from one sentence, in the real system — before you're out of the
-          driveway. Nothing is written until you press Enter.
-        </p>
-      </div>
-      <div>
-        <div class="screen">
-          <div class="bar"><i></i><i></i><i></i><span class="title">Follow Up Boss</span></div>
-          <div class="body" style="min-height:290px">
-            <div class="pill blue" style="position:static; width:100%">
-              <div class="row">
-                <span class="dot"></span>
-                <span class="label" style="color:#e8ecf1; font-weight:600">2 things to do</span>
-              </div>
-              <div class="action">
-                <div class="t">Create person <span class="where">Follow Up Boss</span></div>
-                <dl class="fields">
-                  <dt>name</dt><dd>Maria Lopez</dd>
-                  <dt>phone</dt><dd>555-0142</dd>
-                  <dt>source</dt><dd>Open house at 123 Main St</dd>
-                </dl>
-              </div>
-              <div class="action">
-                <div class="t">Create task <span class="where">Follow Up Boss</span></div>
-                <dl class="fields">
-                  <dt>title</dt><dd>Call Maria Lopez</dd>
-                  <dt>dueDate</dt><dd>Monday, 9:00 AM</dd>
-                </dl>
-              </div>
-              <div class="foot">
-                <span>Enter runs both</span>
-                <span><span class="k">↵</span> run &nbsp; <span class="k">esc</span> cancel</span>
-              </div>
-            </div>
-          </div>
+      </section>
+      <section class="section">
+        <div class="wrap narrow">
+          <h2>A few things you might ask.</h2>
+          <details>
+            <summary>Will it type in every app?</summary>
+            <p>
+              The desktop app sends text through the system clipboard into
+              ordinary editable fields. Some secure fields, remote desktops, or
+              apps may block automatic pasting. You can copy your result from
+              local history or use clipboard-only mode. A browser workspace
+              cannot type into other apps on your phone.
+            </p>
+          </details>
+          <details>
+            <summary>Is it always listening?</summary>
+            <p>
+              No. Recording begins when you activate it and stops when you
+              finish or cancel. The “Is that a mockingbird?” wake phrase is a
+              future option; it is not enabled in this release.
+            </p>
+          </details>
+          <details>
+            <summary>Does it send messages or change my CRM?</summary>
+            <p>
+              This release focuses on dictation and rewriting. You review and
+              send your own messages. Direct CRM and calendar actions are being
+              developed separately.
+            </p>
+          </details>
+          <details>
+            <summary>What happens when my gift ends?</summary>
+            <p>
+              You keep your account and can export or erase your saved
+              preferences. To continue Pro, you can redeem another valid gift or
+              choose a paid membership. A gift never starts billing on its own.
+            </p>
+          </details>
+          <details>
+            <summary>Can I use it offline?</summary>
+            <p>
+              Cloud dictation and rewrites need internet access. If cleanup
+              fails after transcription succeeds, the desktop app preserves the
+              raw words. If transcription fails, you can retry the recording
+              during that app session.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span
+          >Mockingbird by Thunderbird. A little personality goes a long
+          way.</span
+        >
+        <div>
+          <a href="/help">Help</a><a href="/privacy">Privacy</a
+          ><a href="/terms">Terms</a><a href="/account">Account</a>
         </div>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- --------------------------------------------------------------- how -->
-<section id="how">
-  <div class="wrap">
-    <div class="split">
-      <div>
-        <div class="eyebrow">How it works</div>
-        <h2>One key. That's the whole interface.</h2>
-        <ol class="flow" style="margin-top:30px">
-          <li><div><b>Press and talk</b><p>Put your cursor anywhere and hold the shortcut. A small pill shows it's listening.</p></div></li>
-          <li><div><b>It cleans you up</b><p>“Um” disappears. Correct yourself mid-sentence — “2 o'clock, no wait, 3” — and only the 3 survives. Spell an email out loud and it assembles it.</p></div></li>
-          <li><div><b>It lands where you were</b><p>Polished text, at your cursor, in whatever app you were already using.</p></div></li>
-          <li><div><b>Or it acts</b><p>If what you said was an instruction, you get a card showing exactly what will happen. Press Enter and it's done.</p></div></li>
-        </ol>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr; gap:18px">
-        <div class="card">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-          <h3>It sounds like you, not like an AI</h3>
-          <p>Mockingbird learns how you write from your own dictations — your phrasing, your sign-off, the way you close a message.</p>
-        </div>
-        <div class="card">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-          <h3>It never loses your words</h3>
-          <p>Formatter down? You get the raw transcript. No field focused? It goes to your clipboard. Every failure still ends with your words somewhere.</p>
-        </div>
-        <div class="card">
-          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-          <h3>No recordings kept</h3>
-          <p>Your audio is transcribed and discarded — Mockingbird never stores a recording. It runs on your team's own deployment, not a shared service.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ------------------------------------------------------------ learns -->
-<section class="tint" id="learns">
-  <div class="wrap">
-    <div class="head">
-      <div class="eyebrow">It gets better every week</div>
-      <h2>It learns your people, your places, your habits.</h2>
-      <p class="lede">
-        Week one it fixes filler words. Week four it spells your neighbourhoods right, knows
-        that “the Chens” means the contact in your CRM, and writes your follow-ups the way
-        you write them.
-      </p>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <h3>Your vocabulary</h3>
-        <p>Street names, brokerages, client names — the proper nouns every recognizer gets wrong, learned from your own corrections.</p>
-      </div>
-      <div class="card">
-        <h3>Your voice</h3>
-        <p>Sentence length, formality, how you open and close. The polish keeps your voice instead of flattening it.</p>
-      </div>
-      <div class="card">
-        <h3>And you can read all of it</h3>
-        <p>Everything it has picked up is on one page in the app, in plain language. Erase it in one click, or switch learning off entirely.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- --------------------------------------------------------------- faq -->
-<section>
-  <div class="wrap">
-    <h2 style="margin-bottom:12px">Questions</h2>
-    <div style="max-width:840px">
-    <details><summary>How is this different from other dictation apps?</summary>
-      <p>They stop at typing. Mockingbird types just as well, and then does the thing you asked for — creating the contact, logging the call, booking the showing, setting the follow-up — in the system you actually run your business on.</p></details>
-    <details><summary>Can it do something I didn't mean?</summary>
-      <p>It shows you every action before running it, with each field filled in, and waits for you to press Enter. Anything ambiguous is treated as ordinary dictation instead — words in the wrong email are a nuisance, a record created by accident is worse.</p></details>
-    <details><summary>Which apps does it work in?</summary>
-      <p>All of them. It pastes at your cursor like a keyboard would, so anything you can type into, you can talk into — including apps that have never heard of us.</p></details>
-    <details><summary>What does it connect to?</summary>
-      <p>Follow Up Boss works out of the box. Any other product can be connected by describing its endpoints once — no code — and it becomes something you can say.</p></details>
-    <details><summary>Is my dictation private?</summary>
-      <p>It runs on your team's own deployment, not a shared service. Audio is never stored. Transcripts are kept so it can learn how you write — that's readable and erasable by you, and can be turned off.</p></details>
-    <details><summary>What do I need to install?</summary>
-      <p>One app, and about two minutes: install it, paste the address your team gives you, allow the microphone. There's a setup page with the exact steps.</p></details>
-    </div>
-  </div>
-</section>
-
-<div class="final">
-  <h2>The fastest way to run your business<br>is to say it out loud.</h2>
-  <p>Install it, talk into the next email you were about to type, and see how much of your day was typing.</p>
-  <div class="cta">
-    <a class="btn" id="dlFinal" href="#">Download for Mac</a>
-    <a class="btn ghost" href="/install">Set up an installed copy</a>
-  </div>
-</div>
-
-<footer>
-  <div class="wrap">
-    <span>Mockingbird — Thunderbird Agency</span>
-    <span class="sep"><a href="/install">Set up</a></span>
-    <a href="/demo/">Try dictation in the browser</a>
-    <a href="/demo/crm">Voice actions demo</a>
-  </div>
-</footer>
-
-<script>
-(function () {
-  var DOWNLOADS = {
-    mac: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-mac.dmg',
-    windows: 'https://github.com/ThunderbirdAgency/CT-Speak-It/releases/latest/download/Mockingbird-win.exe'
-  };
-
-  // Lead with the visitor's own platform.
-  var isMac = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
-  var first = isMac ? 'mac' : 'windows';
-  var second = isMac ? 'windows' : 'mac';
-  var name = { mac: 'Mac', windows: 'Windows' };
-
-  document.getElementById('dlPrimary').href = DOWNLOADS[first];
-  document.getElementById('dlPrimaryLabel').textContent = 'Download for ' + name[first];
-  document.getElementById('dlSecondary').href = DOWNLOADS[second];
-  document.getElementById('dlSecondaryLabel').textContent = 'Download for ' + name[second];
-  var final = document.getElementById('dlFinal');
-  final.href = DOWNLOADS[first];
-  final.textContent = 'Download for ' + name[first];
-
-  // Hairline under the nav once you start scrolling.
-  var nav = document.getElementById('nav');
-  var onScroll = function () { nav.classList.toggle('stuck', window.scrollY > 8); };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  // The hero types itself out, the way it does when you actually speak.
-  var target = document.getElementById('typed');
-  var sentence = 'Hi Maria — great meeting you at the open house on Saturday. ' +
-    "I've attached the disclosures for 123 Main Street, and I'll call you Monday morning " +
-    'to talk through the numbers.';
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (reduce) {
-    target.textContent = sentence;
-  } else {
-    var i = 0;
-    var caret = document.createElement('span');
-    caret.className = 'caret';
-    var text = document.createTextNode('');
-    target.appendChild(text);
-    target.appendChild(caret);
-    var tick = function () {
-      if (i <= sentence.length) {
-        text.nodeValue = sentence.slice(0, i);
-        i++;
-        // A little variance reads more like speech arriving than a typewriter.
-        setTimeout(tick, sentence.charAt(i) === ' ' ? 34 : 20 + Math.random() * 26);
-      }
-    };
-    setTimeout(tick, 700);
-  }
-})();
-</script>
-</body>
+    </footer>
+  </body>
 </html>

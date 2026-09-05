@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Your Mockingbird</title>
+    <link rel="stylesheet" href="/web/site.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="/"
+          ><span aria-hidden="true">🐦</span>Mockingbird</a
+        >
+        <nav>
+          <a href="/install">Downloads</a><a href="/help">Help</a>
+          <div id="user-button"></div>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap page">
+      <div class="eyebrow">Your little corner of Thunderbird</div>
+      <h1>Make yourself heard.</h1>
+      <div id="message" class="notice" role="status" aria-live="polite">
+        Opening your account…
+      </div>
+      <div id="sign-in"></div>
+      <div id="app" hidden>
+        <div class="row">
+          <p id="membership" class="lede"></p>
+          <a id="hub-link" hidden class="button secondary" href="/"
+            >Open the Hub ↗</a
+          >
+        </div>
+        <div class="tabs" role="tablist" aria-label="Your account">
+          <button role="tab" data-tab="workspace" aria-selected="true">
+            Dictate</button
+          ><button role="tab" data-tab="memory" aria-selected="false">
+            My memory</button
+          ><button role="tab" data-tab="snippets" aria-selected="false">
+            Saved responses</button
+          ><button role="tab" data-tab="devices" aria-selected="false">
+            My devices</button
+          ><button role="tab" data-tab="gift" aria-selected="false">
+            Pro & gifts</button
+          ><button
+            role="tab"
+            data-tab="admin"
+            aria-selected="false"
+            id="admin-tab"
+            hidden
+          >
+            Give access
+          </button>
+        </div>
+        <section id="workspace" role="tabpanel">
+          <div class="grid2">
+            <div class="card">
+              <div class="eyebrow">A space to think out loud</div>
+              <h2>What’s on your mind?</h2>
+              <p>
+                Record here, then copy your words into any app. This also works
+                in supported mobile browsers.
+              </p>
+              <button id="record" type="button">Start dictating</button
+              ><span id="record-status" class="fine" role="status"></span
+              ><label for="draft">Your words</label
+              ><textarea
+                id="draft"
+                rows="9"
+                placeholder="Your transcript will appear here. You can also paste text to rewrite."
+              ></textarea>
+              <div class="actions">
+                <button id="copy" class="secondary">Copy text</button
+                ><button id="clear-draft" class="secondary">Clear</button>
+              </div>
+              <p class="fine">
+                This draft stays in this page’s memory. Copy it before closing.
+                Recordings stop at 3 minutes.
+              </p>
+            </div>
+            <div class="card">
+              <h3>A little polish?</h3>
+              <label for="instruction">How would you like to change it?</label
+              ><input
+                id="instruction"
+                maxlength="1000"
+                placeholder="Make it warmer and a little shorter"
+              /><button id="rewrite" class="secondary" style="margin-top: 16px">
+                Preview rewrite
+              </button>
+              <div id="rewrite-preview" hidden>
+                <label for="revised">Suggested rewrite</label
+                ><textarea id="revised" rows="8"></textarea>
+                <div class="actions">
+                  <button id="accept-rewrite">Use this version</button
+                  ><button id="discard-rewrite" class="secondary">
+                    Keep original
+                  </button>
+                </div>
+              </div>
+              <p class="fine">
+                Review facts, names, and numbers before sending.
+              </p>
+              <p id="usage" class="fine"></p>
+            </div>
+          </div>
+        </section>
+        <section id="memory" role="tabpanel" hidden>
+          <div class="grid2">
+            <div class="card">
+              <h3>Here’s what your bird knows.</h3>
+              <p>
+                Only what you save here. No client dossiers. No hidden archive
+                of dictation.
+              </p>
+              <form id="memory-form">
+                <label
+                  ><input id="memory-enabled" type="checkbox" />Use my saved
+                  memory when polishing</label
+                ><label for="style">How you like to write</label
+                ><textarea
+                  id="style"
+                  maxlength="1000"
+                  placeholder="Warm, direct, short sentences. No exclamation marks."
+                ></textarea
+                ><label for="vocabulary">Names and terms · one per line</label
+                ><textarea
+                  id="vocabulary"
+                  placeholder="MLS&#10;escrow&#10;Poinciana"
+                ></textarea
+                ><label for="phrases">Your phrases · one per line</label
+                ><textarea
+                  id="phrases"
+                  placeholder="Happy to help.&#10;Let me know what you think."
+                ></textarea
+                ><button style="margin-top: 18px">Save my memory</button>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Need a starting point?</h3>
+              <p>
+                Share a short example of your writing. Your bird will suggest a
+                style and useful terms. Nothing is saved until you review and
+                press Save.
+              </p>
+              <label for="sample">Writing sample</label
+              ><textarea
+                id="sample"
+                maxlength="10000"
+                rows="7"
+                placeholder="Choose a sample without private client or deal details."
+              ></textarea
+              ><button id="suggest" class="secondary" style="margin-top: 16px">
+                Suggest preferences
+              </button>
+              <p class="fine">
+                The sample is sent to our text provider for this request.
+                Mockingbird does not save the sample.
+              </p>
+              <hr />
+              <button id="export" class="secondary">
+                Export my account data</button
+              ><button id="erase" class="danger" style="margin-top: 16px">
+                Erase memory & saved responses
+              </button>
+              <p class="fine">
+                Erasing also turns memory off. Device-local history is cleared
+                in the desktop app. Billing records remain separate.
+              </p>
+            </div>
+          </div>
+        </section>
+        <section id="snippets" role="tabpanel" hidden>
+          <div class="grid2">
+            <div class="card">
+              <h3>Your best words, ready again.</h3>
+              <p>
+                Say “insert” followed by your phrase during dictation. The saved
+                response is inserted exactly as written.
+              </p>
+              <form id="snippet-form">
+                <label for="trigger">Spoken phrase</label
+                ><input
+                  id="trigger"
+                  required
+                  maxlength="80"
+                  placeholder="showing follow-up"
+                /><label for="snippet-text">What to insert</label
+                ><textarea
+                  id="snippet-text"
+                  required
+                  maxlength="5000"
+                  placeholder="Thanks for taking a look today. What stood out to you?"
+                ></textarea
+                ><button style="margin-top: 16px">Save response</button>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Saved responses</h3>
+              <div id="snippet-list"></div>
+            </div>
+          </div>
+        </section>
+        <section id="devices" role="tabpanel" hidden>
+          <div class="grid2">
+            <div class="card">
+              <h3>Connect the desktop app.</h3>
+              <p>
+                Download Mockingbird, then create a connection code here and
+                paste it into the app. The code works once and expires in 10
+                minutes.
+              </p>
+              <button id="pair">Create connection code</button>
+              <div id="pair-result" hidden>
+                <p class="code" id="pair-code"></p>
+                <button id="copy-pair" class="secondary">
+                  Copy connection code
+                </button>
+              </div>
+              <p class="fine">
+                Connected devices stay signed in for 30 days. You can revoke a
+                device at any time.
+              </p>
+              <a href="/install" class="button secondary">Get the app ↗</a>
+            </div>
+            <div class="card">
+              <h3>Your connected devices</h3>
+              <div id="device-list"></div>
+            </div>
+          </div>
+        </section>
+        <section id="gift" role="tabpanel" hidden>
+          <div class="grid2">
+            <div class="card">
+              <span class="badge">Mockingbird Pro</span>
+              <div class="price">$15 <small>USD / month</small></div>
+              <p id="access-detail"></p>
+              <div class="actions">
+                <button id="checkout">Start Pro membership</button
+                ><button id="billing" class="secondary">Manage billing</button>
+              </div>
+              <p class="fine">
+                Paid access renews monthly until cancelled. Gift access does not
+                start a subscription. If you already pay and receive a gift,
+                cancel renewal in Manage billing to avoid further charges.
+              </p>
+            </div>
+            <div class="card">
+              <h3>A gift from Thunderbird.</h3>
+              <p>
+                Same Pro features. Your access is covered for the period shown
+                after redemption.
+              </p>
+              <form id="gift-form">
+                <label for="gift-code">Your gift code</label
+                ><input
+                  id="gift-code"
+                  required
+                  autocomplete="off"
+                  placeholder="MB-…"
+                /><button style="margin-top: 16px">Redeem my gift</button>
+              </form>
+              <p class="fine">
+                No payment details needed. Your code is tied to this account
+                once redeemed.
+              </p>
+            </div>
+          </div>
+        </section>
+        <section id="admin" role="tabpanel" hidden>
+          <div class="grid2">
+            <div class="card">
+              <h3>Give someone their time back.</h3>
+              <form id="admin-form">
+                <label for="gift-label">Label for your records</label
+                ><input
+                  id="gift-label"
+                  required
+                  maxlength="120"
+                  placeholder="September agent cohort"
+                /><label for="gift-days">Days of Pro access</label
+                ><input
+                  id="gift-days"
+                  type="number"
+                  min="1"
+                  max="3650"
+                  value="365"
+                  required
+                /><label for="gift-uses">Number of recipients</label
+                ><input
+                  id="gift-uses"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value="1"
+                  required
+                /><button style="margin-top: 16px">Create gift code</button>
+              </form>
+              <p id="new-gift" class="code" hidden></p>
+            </div>
+            <div class="card">
+              <h3>Your gifts</h3>
+              <p class="fine">
+                Revoking a code stops new claims. Existing recipients keep the
+                access already granted.
+              </p>
+              <div id="admin-list"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span>Mockingbird by Thunderbird</span>
+        <div>
+          <a href="/privacy">Privacy</a><a href="/terms">Terms</a
+          ><a href="/help">Help</a>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/web/account.js"></script>
+  </body>
+</html>

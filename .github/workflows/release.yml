@@ -1,82 +1,87 @@
-# Builds the Mac and Windows installers and attaches them to a GitHub Release.
-#
-#   git tag v1.0.0 && git push origin v1.0.0
-#
-# Two runners because a .dmg can only be built on macOS and an .exe installer on
-# Windows — this is what saves you from needing both machines on your desk.
-#
-# Builds are UNSIGNED. Fine internally (Mac: right-click → Open the first time;
-# Windows: click through SmartScreen), but sign before a wide rollout — an
-# unsigned app that asks for Accessibility permission is a hard sell. To sign,
-# add the certificate secrets electron-builder expects (CSC_LINK / CSC_KEY_PASSWORD
-# on macOS, WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD on Windows) and drop the
-# CSC_IDENTITY_AUTO_DISCOVERY line below.
-name: Release desktop installers
-
+name: Release signed desktop installers
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g. 1.0.0)'
-        required: true
-
+permissions:
+  contents: read
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:consumer
   build:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             build: dist:mac
-            pattern: desktop/dist/*.dmg
           - os: windows-latest
             build: dist:win
-            pattern: desktop/dist/*.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
-
-      # Keep the installer filename and the tag in step, so a downloaded file
-      # says which release it came from.
-      - name: Set version from the tag
+      - name: Verify release version
         shell: bash
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          if [ -z "$VERSION" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          npm version "$VERSION" --no-git-tag-version --allow-same-version
+        env:
+          RELEASE_REF: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: node tools/check-release.cjs
         working-directory: desktop
-
-      - name: Install
-        run: npm ci
+      - run: npm ci
         working-directory: desktop
-
-      - name: Build installer
-        run: npm run ${{ matrix.build }}
+      - name: Build signed and notarized installers
+        run: npm run ${{ matrix.build }} -- --publish never
         working-directory: desktop
         env:
-          # Don't hunt for a signing identity that isn't there.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: mockingbird-${{ matrix.os }}
-          path: ${{ matrix.pattern }}
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+            desktop/dist/*.yml
+            desktop/dist/*.blockmap
           if-no-files-found: error
-
-      # Uses the token GitHub already gives the job — no third-party action,
-      # nothing to rotate.
-      - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: gh release upload "$GITHUB_REF_NAME" ${{ matrix.pattern }} --clobber
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mockingbird-*
+          merge-multiple: true
+          path: artifacts
+      - name: Create reviewable release draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --draft --title "Mockingbird $RELEASE_TAG" --notes "Signed desktop release. Publish after real Mac and Windows microphone, paste, rewrite and update verification."
+          gh release upload "$RELEASE_TAG" artifacts/* --clobber

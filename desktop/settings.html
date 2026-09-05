@@ -1,655 +1,183 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Mockingbird</title>
-<style>
-  :root {
-    --bg: #0d1117;
-    --panel: #141a22;
-    --panel-2: #1a212b;
-    --ink: #e8ecf1;
-    --muted: #97a3b4;
-    --line: #232c38;
-    --accent: #6ea8fe;
-    --ok: #3fbf78;
-    --warn: #d9a521;
-    --bad: #e06c6c;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body {
-    background: var(--bg); color: var(--ink);
-    font: 400 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
-    display: flex;
-  }
-  a { color: var(--accent); }
-
-  /* ---------------------------------------------------------------- nav */
-  nav {
-    width: 200px; flex: none; padding: 22px 12px; border-right: 1px solid var(--line);
-    background: var(--panel); display: flex; flex-direction: column; gap: 2px;
-  }
-  .brand { display: flex; align-items: center; gap: 9px; padding: 0 10px 18px; }
-  .brand .mark {
-    width: 26px; height: 26px; border-radius: 8px; flex: none;
-    background: linear-gradient(160deg, #1e2530, #0c1014);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
-    display: grid; place-items: center;
-  }
-  .brand .mark svg { width: 15px; height: 15px; }
-  .brand b { font-size: 15px; font-weight: 650; letter-spacing: .2px; }
-  nav button {
-    all: unset; padding: 8px 11px; border-radius: 9px; cursor: pointer;
-    color: var(--muted); font-size: 13.5px;
-  }
-  nav button:hover { background: var(--panel-2); color: var(--ink); }
-  nav button.on { background: var(--panel-2); color: var(--ink); font-weight: 600; }
-  nav .spacer { flex: 1; }
-  nav .status { padding: 10px; font-size: 12px; color: var(--muted); line-height: 1.4; }
-
-  /* --------------------------------------------------------------- main */
-  main { flex: 1; overflow-y: auto; padding: 30px 34px 60px; }
-  h1 { font-size: 21px; margin: 0 0 4px; font-weight: 650; }
-  .sub { color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
-  h2 { font-size: 14px; margin: 26px 0 10px; font-weight: 650; }
-  section { display: none; max-width: 720px; }
-  section.on { display: block; }
-
-  .field { margin-bottom: 16px; }
-  label.lab { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
-  input[type=text], input[type=password], select, textarea {
-    width: 100%; padding: 9px 11px; border-radius: 9px; color: var(--ink);
-    background: var(--panel); border: 1px solid var(--line);
-    font: inherit; font-size: 13.5px;
-  }
-  textarea { min-height: 96px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-  button.btn {
-    all: unset; cursor: pointer; padding: 8px 15px; border-radius: 9px;
-    background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
-    font-size: 13.5px; font-weight: 550;
-  }
-  button.btn:hover { background: #202936; }
-  button.btn.primary { background: linear-gradient(180deg, #3d6fd4, #2f58ad); box-shadow: none; }
-  button.btn.primary:hover { filter: brightness(1.08); }
-  button.btn.quiet { background: none; color: var(--muted); }
-  button.btn.quiet:hover { color: var(--ink); background: var(--panel-2); }
-  button.btn.danger { color: var(--bad); }
-  .buttons { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
-
-  .check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 13px; }
-  .check input { margin-top: 3px; accent-color: var(--accent); }
-  .check .t { font-size: 13.5px; }
-  .check .d { font-size: 12px; color: var(--muted); }
-
-  .card {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 15px 17px; margin-bottom: 12px;
-  }
-  .card h3 { margin: 0; font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 9px; }
-  .pill {
-    font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px;
-    background: rgba(110,168,254,.14); color: #a9caff;
-  }
-  .pill.off { background: rgba(151,163,180,.14); color: var(--muted); }
-  .pill.ok { background: rgba(63,191,120,.15); color: #7ee2a8; }
-  .pill.bad { background: rgba(224,108,108,.15); color: #ffa9a9; }
-
-  .note { border-radius: 10px; padding: 11px 14px; font-size: 13px; margin: 14px 0; }
-  .note.ok { background: rgba(63,191,120,.1); color: #a5e7c3; }
-  .note.bad { background: rgba(224,108,108,.1); color: #ffbdbd; }
-  .note.info { background: rgba(110,168,254,.09); color: #bcd5ff; }
-
-  ul.plain { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
-  ul.plain li { margin-bottom: 3px; }
-  .kbd {
-    font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px;
-    background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
-  }
-
-  .entry { border-bottom: 1px solid var(--line); padding: 12px 2px; }
-  .entry:last-child { border-bottom: none; }
-  .entry .meta { font-size: 11.5px; color: var(--muted); display: flex; gap: 9px; align-items: center; }
-  .entry .said { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
-  .entry .out { margin-top: 3px; }
-  .empty { color: var(--muted); padding: 26px 0; }
-</style>
-</head>
-<body>
-  <nav>
-    <div class="brand">
-      <span class="mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#e8ecf1" stroke-width="2" stroke-linecap="round">
-          <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
-          <path d="M18 11a6 6 0 0 1-12 0"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </span>
-      <b>Mockingbird</b>
-    </div>
-    <button data-tab="setup" class="on">Setup</button>
-    <button data-tab="connectors">Connectors</button>
-    <button data-tab="learning">What it's learned</button>
-    <button data-tab="history">History</button>
-    <div class="spacer"></div>
-    <div class="status" id="navStatus"></div>
-  </nav>
-
-  <main>
-    <!-- ------------------------------------------------------------ setup -->
-    <section id="tab-setup" class="on">
-      <h1>Setup</h1>
-      <p class="sub">Two things to fill in and you're done. Everything else has a sensible default.</p>
-
-      <div class="field">
-        <label class="lab" for="baseUrl">1 · Your Mockingbird deployment</label>
-        <input type="text" id="baseUrl" placeholder="https://mockingbird-yourteam.vercel.app" spellcheck="false">
-        <div class="hint">The URL your team deployed this repo to. Ask whoever set it up, or deploy it yourself — see the README.</div>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'"
+    />
+    <title>Mockingbird</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="brand"><span aria-hidden="true">🐦</span>Mockingbird</div>
+        <button id="account" class="secondary small">Open my account ↗</button>
       </div>
-
-      <div class="field">
-        <label class="lab" for="accessKey">Access key <span style="opacity:.6">— only if your team set one</span></label>
-        <input type="password" id="accessKey" placeholder="leave empty unless you were given one" spellcheck="false">
+    </header>
+    <main class="wrap page">
+      <div class="eyebrow">Your voice. Your desktop.</div>
+      <h1>A little less typing.</h1>
+      <p id="message" class="notice" role="status">Loading your bird…</p>
+      <div class="tabs" role="tablist" aria-label="Settings">
+        <button data-tab="setup" role="tab" aria-selected="true">
+          Get connected</button
+        ><button data-tab="preferences" role="tab" aria-selected="false">
+          Preferences</button
+        ><button data-tab="history" role="tab" aria-selected="false">
+          History & recovery
+        </button>
       </div>
-
-      <div class="field">
-        <label class="lab" for="userId">2 · Who's speaking</label>
-        <input type="text" id="userId" placeholder="erik" spellcheck="false">
-        <div class="hint">Used to keep your dictionary and your writing style separate from everyone else's.</div>
-      </div>
-
-      <div id="checkResult"></div>
-
-      <h2>Shortcuts</h2>
-      <div class="row2">
-        <div class="field">
-          <label class="lab" for="dictationHotkey">Dictate</label>
-          <input type="text" id="dictationHotkey" spellcheck="false">
-          <div class="hint">Press once to start, again to finish.</div>
+      <section id="setup" role="tabpanel">
+        <div class="card">
+          <h3>Your account, connected.</h3>
+          <p id="connection"></p>
+          <form id="connect-form">
+            <label for="connection-code"
+              >Connection code from your account’s My devices tab</label
+            ><input
+              id="connection-code"
+              type="password"
+              autocomplete="off"
+              required
+              placeholder="Paste the full code here"
+            />
+            <div class="actions">
+              <button>Connect this device</button
+              ><button id="disconnect" type="button" class="secondary">
+                Sign out of this device
+              </button>
+            </div>
+          </form>
+          <p class="fine">
+            The code works once and expires after 10 minutes. No API keys or
+            passwords to configure.
+          </p>
         </div>
-        <div class="field">
-          <label class="lab" for="commandHotkey">Command</label>
-          <input type="text" id="commandHotkey" spellcheck="false">
-          <div class="hint">Speak an instruction instead of text.</div>
+        <div class="card">
+          <h3>Ready for your first dictation?</h3>
+          <ol>
+            <li>Allow microphone access.</li>
+            <li>
+              On Mac, allow Mockingbird in System Settings → Privacy &amp;
+              Security → Accessibility for automatic paste.
+            </li>
+            <li>Click a text field in another app.</li>
+            <li>Press your dictation shortcut, speak, and press it again.</li>
+          </ol>
+          <button id="microphone" class="secondary">Allow microphone</button>
+          <p class="fine">
+            Some secure fields block automatic paste. Your words are copied to
+            the clipboard so you can paste manually.
+          </p>
         </div>
-      </div>
-      <div class="hint">Write them like <span class="kbd">CommandOrControl+Shift+Space</span> — modifiers joined with <b>+</b>.</div>
-
-      <h2>Behaviour</h2>
-      <div class="check">
-        <input type="checkbox" id="autoPaste">
-        <div><div class="t">Paste automatically</div>
-          <div class="d">Off means the text waits on your clipboard and you press paste yourself.</div></div>
-      </div>
-      <div class="check">
-        <input type="checkbox" id="smartCommands">
-        <div><div class="t">Notice commands while dictating</div>
-          <div class="d">If what you said is clearly an instruction ("add Maria to the CRM"), offer to run it instead of typing it. Ambiguous speech is always treated as dictation.</div></div>
-      </div>
-      <div class="check">
-        <input type="checkbox" id="confirmActions">
-        <div><div class="t">Ask before doing anything</div>
-          <div class="d">Shows exactly what will happen and waits for <span class="kbd">Enter</span>. Recommended.</div></div>
-      </div>
-      <div class="check">
-        <input type="checkbox" id="launchAtLogin">
-        <div><div class="t">Start when I log in</div>
-          <div class="d">Sits quietly in the menu bar / system tray.</div></div>
-      </div>
-
-      <div class="row2">
-        <div class="field">
-          <label class="lab" for="tone">Writing style</label>
-          <select id="tone">
-            <option value="clean">Clean — sounds like you, tidied up</option>
-            <option value="formal">Formal — business email</option>
-            <option value="casual">Casual — chat message</option>
-            <option value="code-comment">Terse — notes and commit messages</option>
-          </select>
+        <div class="actions">
+          <button id="updates" class="secondary">Check for updates</button
+          ><button id="install-update" hidden>Restart & update</button
+          ><span id="version" class="fine"></span>
         </div>
-        <div class="field">
-          <label class="lab" for="lang">Language</label>
-          <input type="text" id="lang" placeholder="en-US" spellcheck="false">
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="lab" for="dictionary">Words to always get right</label>
-        <input type="text" id="dictionary" placeholder="Poinciana, Thunderbird, APU, Follow Up Boss" spellcheck="false">
-        <div class="hint">Comma separated: neighbourhoods, brokerages, client names it keeps mishearing.</div>
-      </div>
-
-      <div class="buttons">
-        <button class="btn primary" id="saveSetup">Save</button>
-        <button class="btn" id="testDeployment">Test connection</button>
-        <button class="btn quiet" id="tryIt">Try dictating</button>
-      </div>
-
-      <div class="note info" id="permissionNote"></div>
-    </section>
-
-    <!-- ------------------------------------------------------- connectors -->
-    <section id="tab-connectors">
-      <h1>Connectors</h1>
-      <p class="sub">This is what makes Mockingbird more than dictation: connect the systems you work in and you can say what you want done instead of clicking through forms.</p>
-
-      <div id="connectorList"></div>
-
-      <h2>Add a connector</h2>
-      <div class="card">
-        <h3>Follow Up Boss</h3>
-        <div class="hint" style="margin:6px 0 12px">Contacts, notes, tasks, calls, appointments and stage changes — spoken. Get a key from Follow Up Boss → Admin → API.</div>
-        <div class="field">
-          <label class="lab" for="fubKey">API key</label>
-          <input type="password" id="fubKey" placeholder="fka_..." spellcheck="false">
-        </div>
-        <button class="btn" id="addFub">Connect Follow Up Boss</button>
-      </div>
-
-      <div class="card">
-        <h3>Your own product <span class="pill">advanced</span></h3>
-        <div class="hint" style="margin:6px 0 12px">Describe an app's endpoints once and they become things you can say. This is how our own builds (the CRM, Agent Power Ups) get voice actions without embedding anything.</div>
-        <div class="row2">
-          <div class="field">
-            <label class="lab" for="customLabel">Name</label>
-            <input type="text" id="customLabel" placeholder="Agent Power Ups">
+      </section>
+      <section id="preferences" role="tabpanel" hidden>
+        <form id="preferences-form" class="card">
+          <h3>Make it feel natural.</h3>
+          <div class="grid2">
+            <div>
+              <label for="dictationHotkey">Dictation shortcut</label
+              ><input id="dictationHotkey" required />
+            </div>
+            <div>
+              <label for="rewriteHotkey">Rewrite selected text</label
+              ><input id="rewriteHotkey" required />
+            </div>
           </div>
-          <div class="field">
-            <label class="lab" for="customBase">Base URL</label>
-            <input type="text" id="customBase" placeholder="https://apu.yourteam.com" spellcheck="false">
+          <p class="fine">
+            For example: CommandOrControl+Shift+Space. Select text first, then
+            use the rewrite shortcut and speak an instruction. Review before
+            applying.
+          </p>
+          <div class="grid2">
+            <div>
+              <label for="tone">Writing tone</label
+              ><select id="tone">
+                <option value="clean">Natural cleanup</option>
+                <option value="formal">Professional</option>
+                <option value="casual">Friendly</option>
+              </select>
+            </div>
+            <div>
+              <label for="lang">Speech language</label
+              ><select id="lang">
+                <option value="en-US">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="pt">Portuguese</option>
+                <option value="it">Italian</option>
+              </select>
+            </div>
           </div>
+          <label for="dictionary"
+            >Extra spellings for this device · one per line</label
+          ><textarea id="dictionary"></textarea
+          ><label
+            ><input id="autoPaste" type="checkbox" />Send the paste shortcut
+            automatically</label
+          ><label
+            ><input id="learn" type="checkbox" />Use my approved account memory
+            for dictation</label
+          >
+          <p class="fine">
+            Memory also needs to be enabled in your account. This setting does
+            not authorize recording or save transcripts to the server.
+          </p>
+          <label
+            ><input id="keepHistory" type="checkbox" />Keep up to 200 recent
+            results on this device</label
+          ><label
+            ><input id="launchAtLogin" type="checkbox" />Open Mockingbird when I
+            sign in to this computer</label
+          ><label for="autoStopSeconds"
+            >Stop after this many seconds of silence · 0 means manual</label
+          ><input id="autoStopSeconds" type="number" min="0" max="20" />
+          <div class="actions"><button>Save preferences</button></div>
+          <p class="fine">
+            Recording starts only on activation and stops after three minutes at
+            most. Dictation never executes CRM commands.
+          </p>
+        </form>
+      </section>
+      <section id="history" role="tabpanel" hidden>
+        <div class="card">
+          <h3>A second chance for your words.</h3>
+          <p>
+            The last recording is held in memory for retry. It is replaced by
+            your next recording and discarded when you quit.
+          </p>
+          <div class="actions">
+            <button id="retry">Retry last recording</button
+            ><button id="forget-recording" class="secondary">
+              Discard recording</button
+            ><button id="clear-history" class="secondary">
+              Clear saved history
+            </button>
+          </div>
+          <p class="fine">
+            Retry a rewrite with the original text still selected in the target
+            app. The result will be shown for review.
+          </p>
         </div>
-        <div class="field">
-          <label class="lab" for="customHeaders">Headers (JSON)</label>
-          <input type="password" id="customHeaders" placeholder='{"Authorization": "Bearer ..."}' spellcheck="false">
+        <div class="card">
+          <h3>Recent results</h3>
+          <p class="fine">
+            Local history is off by default. Enable it in Preferences if you
+            want a recovery list. Your system clipboard keeps the latest output.
+          </p>
+          <div id="history-list"></div>
         </div>
-        <div class="field">
-          <label class="lab" for="customActions">Actions (JSON array)</label>
-          <textarea id="customActions" spellcheck="false" placeholder='[
-  {
-    "name": "create_open_house",
-    "description": "Schedule an open house. Trigger on \"open house\", \"showing\".",
-    "input_schema": { "type": "object", "properties": { "address": {"type":"string"}, "date": {"type":"string"} }, "required": ["address"] },
-    "method": "POST",
-    "path": "/api/open-houses",
-    "summary": "Open house at {{address}}"
-  }
-]'></textarea>
-          <div class="hint">Full reference: docs/CONNECTORS.md in the Mockingbird repo.</div>
-        </div>
-        <button class="btn" id="addCustom">Add product</button>
-      </div>
-
-      <h2>What you can say right now</h2>
-      <div id="commandList" class="hint">…</div>
-    </section>
-
-    <!-- --------------------------------------------------------- learning -->
-    <section id="tab-learning">
-      <h1>What it's learned</h1>
-      <p class="sub">Mockingbird reads back your own dictations so it writes the way you write and gets your people's names right. Everything it has picked up is on this page — nothing is hidden, and you can erase it whenever you like.</p>
-
-      <div class="check">
-        <input type="checkbox" id="learn">
-        <div><div class="t">Let Mockingbird learn from my dictations</div>
-          <div class="d">Off means each thing you say is handled on its own and forgotten.</div></div>
-      </div>
-
-      <div id="profileBox"></div>
-
-      <div class="buttons">
-        <button class="btn" id="refreshProfile">Update now</button>
-        <button class="btn danger" id="forgetProfile">Erase what it knows</button>
-      </div>
-    </section>
-
-    <!-- ---------------------------------------------------------- history -->
-    <section id="tab-history">
-      <h1>History</h1>
-      <p class="sub">The last things you said on this machine. Stored locally so you can grab something you dictated a minute ago.</p>
-      <div id="historyList"></div>
-      <div class="buttons">
-        <button class="btn quiet danger" id="clearHistory">Clear history</button>
-      </div>
-    </section>
-  </main>
-
-<script>
-(function () {
-  var config = {};
-
-  // ------------------------------------------------------------------ util
-
-  function $(id) { return document.getElementById(id); }
-
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text != null) node.textContent = text;
-    return node;
-  }
-
-  function note(container, kind, text) {
-    container.innerHTML = '';
-    if (!text) return;
-    container.appendChild(el('div', 'note ' + kind, text));
-  }
-
-  function when(iso) {
-    var d = new Date(iso);
-    var today = new Date().toDateString() === d.toDateString();
-    return today
-      ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-      : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  }
-
-  // ------------------------------------------------------------------ tabs
-
-  function openTab(name) {
-    document.querySelectorAll('nav button').forEach(function (b) {
-      b.classList.toggle('on', b.dataset.tab === name);
-    });
-    document.querySelectorAll('section').forEach(function (s) {
-      s.classList.toggle('on', s.id === 'tab-' + name);
-    });
-    if (name === 'history') renderHistory();
-    if (name === 'learning') loadProfile();
-    if (name === 'connectors') { renderConnectors(); loadCommands(); }
-  }
-
-  document.querySelectorAll('nav button').forEach(function (b) {
-    b.addEventListener('click', function () { openTab(b.dataset.tab); });
-  });
-
-  // ----------------------------------------------------------------- setup
-
-  var SETUP_FIELDS = ['baseUrl', 'accessKey', 'userId', 'dictationHotkey', 'commandHotkey', 'tone', 'lang'];
-  var SETUP_CHECKS = ['autoPaste', 'smartCommands', 'confirmActions', 'launchAtLogin'];
-
-  function fillSetup() {
-    SETUP_FIELDS.forEach(function (k) { $(k).value = config[k] || ''; });
-    SETUP_CHECKS.forEach(function (k) { $(k).checked = config[k] !== false; });
-    $('learn').checked = config.learn !== false;
-    $('dictionary').value = (config.dictionary || []).join(', ');
-    $('permissionNote').textContent = navigator.platform.indexOf('Mac') === 0
-      ? 'On a Mac, the first dictation asks for microphone access. For text to paste itself, also allow Mockingbird under System Settings → Privacy & Security → Accessibility. Until then, dictated text waits on your clipboard.'
-      : 'Windows asks for microphone access on your first dictation. Nothing else to allow.';
-    renderNavStatus();
-  }
-
-  function renderNavStatus() {
-    var status = $('navStatus');
-    status.innerHTML = '';
-    var connectors = (config.connectors || []).filter(function (c) { return c.enabled !== false; });
-    status.appendChild(el('div', null,
-      config.baseUrl ? 'Connected to your deployment' : 'Not set up yet'));
-    status.appendChild(el('div', null, connectors.length
-      ? connectors.map(function (c) { return c.label || c.type; }).join(', ')
-      : 'No connectors'));
-    status.appendChild(el('div', null,
-      (config.dictationHotkey || '').replace('CommandOrControl',
-        navigator.platform.indexOf('Mac') === 0 ? 'Cmd' : 'Ctrl') + ' to dictate'));
-  }
-
-  async function save(patch) {
-    config = await window.mbapp.saveConfig(patch);
-    renderNavStatus();
-    return config;
-  }
-
-  $('saveSetup').addEventListener('click', async function () {
-    var patch = {};
-    SETUP_FIELDS.forEach(function (k) { patch[k] = $(k).value.trim(); });
-    SETUP_CHECKS.forEach(function (k) { patch[k] = $(k).checked; });
-    patch.baseUrl = patch.baseUrl.replace(/\/$/, '');
-    patch.dictionary = $('dictionary').value.split(',')
-      .map(function (w) { return w.trim(); }).filter(Boolean);
-    await save(patch);
-    note($('checkResult'), 'ok', 'Saved. ' + (patch.baseUrl
-      ? 'Press ' + patch.dictationHotkey.replace('CommandOrControl',
-          navigator.platform.indexOf('Mac') === 0 ? 'Cmd' : 'Ctrl') + ' anywhere to dictate.'
-      : 'Add your deployment URL to start dictating.'));
-  });
-
-  $('testDeployment').addEventListener('click', async function () {
-    var url = $('baseUrl').value.trim().replace(/\/$/, '');
-    note($('checkResult'), 'info', 'Checking ' + url + '…');
-    var result = await window.mbapp.checkDeployment(url);
-    if (!result.ok) { note($('checkResult'), 'bad', 'Could not reach it: ' + result.error); return; }
-    var missing = [];
-    if (!result.configured.transcription) missing.push('speech-to-text (GROQ_API_KEY)');
-    if (!result.configured.ai) missing.push('Claude (ANTHROPIC_API_KEY)');
-    if (missing.length) {
-      note($('checkResult'), 'bad',
-        'Reached the deployment, but it is missing: ' + missing.join(', ') +
-        '. Whoever deployed it needs to add those environment variables.');
-      return;
-    }
-    if (result.requiresKey && !$('accessKey').value.trim()) {
-      note($('checkResult'), 'bad',
-        'Deployment is healthy, but it requires an access key — ask whoever set it up, and paste it above.');
-      return;
-    }
-    note($('checkResult'), 'ok',
-      'Deployment is healthy' + (result.configured.log ? ' (with the shared event log on).' : '.'));
-  });
-
-  $('tryIt').addEventListener('click', function () { window.mbapp.dictateNow(); });
-
-  // ------------------------------------------------------------ connectors
-
-  function renderConnectors() {
-    var list = $('connectorList');
-    list.innerHTML = '';
-    var connectors = config.connectors || [];
-    if (!connectors.length) {
-      list.appendChild(el('div', 'empty', 'Nothing connected yet. Mockingbird still types for you everywhere — connect a system below and it can also act.'));
-      return;
-    }
-    connectors.forEach(function (connector, index) {
-      var card = el('div', 'card');
-      var head = el('h3', null, connector.label || connector.type);
-      head.appendChild(el('span', 'pill ' + (connector.enabled === false ? 'off' : 'ok'),
-        connector.enabled === false ? 'paused' : 'live'));
-      card.appendChild(head);
-      if (connector.type === 'custom') {
-        card.appendChild(el('div', 'hint',
-          (connector.config && connector.config.baseUrl || '') + ' · ' +
-          ((connector.config && connector.config.actions || []).length) + ' actions'));
-      } else {
-        card.appendChild(el('div', 'hint', 'Follow Up Boss API'));
-      }
-      var buttons = el('div', 'buttons');
-      var toggle = el('button', 'btn', connector.enabled === false ? 'Resume' : 'Pause');
-      toggle.addEventListener('click', async function () {
-        var next = (config.connectors || []).slice();
-        next[index] = Object.assign({}, next[index], { enabled: next[index].enabled === false });
-        await save({ connectors: next });
-        renderConnectors(); loadCommands();
-      });
-      var remove = el('button', 'btn quiet danger', 'Remove');
-      remove.addEventListener('click', async function () {
-        var next = (config.connectors || []).slice();
-        next.splice(index, 1);
-        await save({ connectors: next });
-        renderConnectors(); loadCommands();
-      });
-      buttons.appendChild(toggle);
-      buttons.appendChild(remove);
-      card.appendChild(buttons);
-      list.appendChild(card);
-    });
-  }
-
-  $('addFub').addEventListener('click', async function () {
-    var key = $('fubKey').value.trim();
-    if (!key) return;
-    var next = (config.connectors || []).filter(function (c) { return c.type !== 'followupboss'; });
-    next.push({
-      id: 'followupboss', type: 'followupboss', label: 'Follow Up Boss',
-      enabled: true, credentials: { apiKey: key }, config: {}
-    });
-    await save({ connectors: next });
-    $('fubKey').value = '';
-    renderConnectors(); loadCommands();
-  });
-
-  $('addCustom').addEventListener('click', async function () {
-    var label = $('customLabel').value.trim() || 'My product';
-    var baseUrl = $('customBase').value.trim();
-    var headers = $('customHeaders').value.trim();
-    var actionsText = $('customActions').value.trim();
-    var actions;
-    try { actions = JSON.parse(actionsText || '[]'); } catch (e) {
-      note($('commandList'), 'bad', 'The actions JSON has a syntax error: ' + e.message);
-      return;
-    }
-    if (headers) {
-      try { JSON.parse(headers); } catch (e) {
-        note($('commandList'), 'bad', 'The headers JSON has a syntax error: ' + e.message);
-        return;
-      }
-    }
-    var next = (config.connectors || []).slice();
-    next.push({
-      id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'product',
-      type: 'custom', label: label, enabled: true,
-      credentials: {},
-      config: { label: label, baseUrl: baseUrl, headers: headers, actions: actions }
-    });
-    await save({ connectors: next });
-    $('customLabel').value = ''; $('customBase').value = '';
-    $('customHeaders').value = ''; $('customActions').value = '';
-    renderConnectors(); loadCommands();
-  });
-
-  async function loadCommands() {
-    var box = $('commandList');
-    box.textContent = 'Loading…';
-    var result = await window.mbapp.listCommands();
-    box.innerHTML = '';
-    if (result.error) { note(box, 'bad', result.error); return; }
-    if (!result.tools || !result.tools.length) {
-      box.appendChild(el('div', 'empty', 'Connect something above and the things you can say will be listed here.'));
-      return;
-    }
-    var ul = el('ul', 'plain');
-    result.tools.forEach(function (tool) {
-      ul.appendChild(el('li', null, tool.name.replace(/^fub_/, '').replace(/_/g, ' ') + ' — ' + tool.description));
-    });
-    box.appendChild(ul);
-  }
-
-  // -------------------------------------------------------------- learning
-
-  $('learn').addEventListener('change', function () { save({ learn: $('learn').checked }); });
-
-  async function loadProfile() {
-    var box = $('profileBox');
-    box.textContent = 'Loading…';
-    var result = await window.mbapp.profile();
-    box.innerHTML = '';
-    if (result.error) { note(box, 'bad', result.error); return; }
-    if (result.enabled === false) {
-      note(box, 'info', 'The deployment has learning switched off, or has no database configured. Mockingbird works exactly the same — it just starts fresh every time.');
-      return;
-    }
-    if (!result.profile) {
-      note(box, 'info', 'Nothing learned yet. After a few dozen dictations, what it has picked up will appear here.');
-      return;
-    }
-    var card = el('div', 'card');
-    if (result.summary) card.appendChild(el('div', null, result.summary));
-    if (result.updated_at) {
-      card.appendChild(el('div', 'hint', 'Updated ' + when(result.updated_at) +
-        (result.events_seen ? ' · from your last ' + result.events_seen + ' dictations' : '')));
-    }
-    box.appendChild(card);
-
-    var sections = [
-      ['writing_style', 'How you write'],
-      ['phrases', 'Phrases you use'],
-      ['vocabulary', 'Words it now spells correctly'],
-      ['people', 'People you mention'],
-      ['working_patterns', 'How you work'],
-      ['preferences', 'Preferences it noticed']
-    ];
-    sections.forEach(function (pair) {
-      var value = result.profile[pair[0]];
-      if (!value || (Array.isArray(value) && !value.length)) return;
-      var card = el('div', 'card');
-      card.appendChild(el('h3', null, pair[1]));
-      if (Array.isArray(value)) {
-        var ul = el('ul', 'plain');
-        value.forEach(function (item) { ul.appendChild(el('li', null, item)); });
-        card.appendChild(ul);
-      } else {
-        card.appendChild(el('div', 'hint', value));
-      }
-      box.appendChild(card);
-    });
-  }
-
-  $('refreshProfile').addEventListener('click', async function () {
-    $('profileBox').textContent = 'Reading your recent dictations…';
-    await window.mbapp.profile('refresh');
-    loadProfile();
-  });
-
-  $('forgetProfile').addEventListener('click', async function () {
-    await window.mbapp.profile('forget');
-    loadProfile();
-  });
-
-  // --------------------------------------------------------------- history
-
-  async function renderHistory() {
-    var list = $('historyList');
-    var entries = await window.mbapp.getHistory();
-    list.innerHTML = '';
-    if (!entries.length) {
-      list.appendChild(el('div', 'empty', 'Nothing yet. Press your dictation shortcut anywhere and it will show up here.'));
-      return;
-    }
-    entries.forEach(function (entry) {
-      var item = el('div', 'entry');
-      var meta = el('div', 'meta');
-      meta.appendChild(el('span', null, when(entry.at)));
-      meta.appendChild(el('span', 'pill' + (entry.ok === false ? ' bad' : entry.kind === 'command' ? ' ok' : ' off'), entry.kind));
-      item.appendChild(meta);
-      if (entry.transcript) item.appendChild(el('div', 'said', '“' + entry.transcript + '”'));
-      if (entry.text) {
-        var out = el('div', 'out', entry.text);
-        out.title = 'Click to copy';
-        out.style.cursor = 'pointer';
-        out.addEventListener('click', function () { navigator.clipboard.writeText(entry.text); });
-        item.appendChild(out);
-      }
-      list.appendChild(item);
-    });
-  }
-
-  $('clearHistory').addEventListener('click', async function () {
-    await window.mbapp.clearHistory();
-    renderHistory();
-  });
-
-  window.mbapp.onHistoryChanged(function () {
-    if ($('tab-history').classList.contains('on')) renderHistory();
-  });
-  window.mbapp.onOpenTab(function (tab) { openTab(tab); });
-
-  // ----------------------------------------------------------------- boot
-
-  window.mbapp.getConfig().then(function (cfg) {
-    config = cfg;
-    fillSetup();
-    renderConnectors();
-  });
-})();
-</script>
-</body>
+      </section>
+    </main>
+    <script src="settings.js"></script>
+  </body>
 </html>
