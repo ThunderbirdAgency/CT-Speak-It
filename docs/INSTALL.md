@@ -1,144 +1,49 @@
-# Getting Mockingbird running
+# Consumer deployment
 
-Two audiences here: whoever sets it up once for the team, and the agents who
-just want to talk instead of type. Their part is three steps at the bottom.
+Use the existing ThunderbirdAgency/CT-Speak-It Vercel project. Do not create a replacement Hub or authentication tenant.
 
----
+## Database
 
-# For whoever sets it up (about 20 minutes, once)
+Apply `db/migrations/20260905_consumer.sql` to the Hub database. This additive migration creates accounts, gifts/redemptions, pairing/devices and quotas. It does not change Hub profiles, power-up entitlements or legacy event rows. In this work session it was applied successfully to `apu-command-center` on September 5, 2026, and live grants were verified.
 
-## 1. Deploy this repo
+All new tables use RLS and deny `anon`/`authenticated` direct access. The verified server uses the service role. All RPCs use invoker security, fixed search paths and explicit service-role-only grants. Supabase's informational “RLS Enabled No Policy” notice is expected for these deliberately backend-only tables; do not add public policies to silence it.
 
-Vercel is the path of least resistance — the `/api` folder is already
-serverless functions.
+The older `db/schema.sql` is historical logging infrastructure and is not needed for a new consumer deployment. Do not run it to enable transcript collection.
 
-```bash
-npm i -g vercel
-vercel --prod
-```
+## Clerk and Hub
 
-Then set the environment variables on the project:
+Use the Hub's Clerk instance. Configure Mockingbird's production hostname and frontend/satellite domain according to the Clerk instance's domain settings. Set `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_AUTHORIZED_PARTIES` (explicit full frontend origins), and optionally `CLERK_JWT_KEY` for networkless verification. Verify real sign-in from the Hub and the Mockingbird site before rollout; sharing a key does not by itself configure multi-domain SSO.
 
-| Variable | What it turns on | Needed? |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | The polish and the command understanding | **yes** |
-| `GROQ_API_KEY` | Whisper-grade transcription (fastest, cheapest) | **yes** — or one of the two below |
-| `DEEPGRAM_API_KEY` | `nova-3` instead | alternative |
-| `OPENAI_API_KEY` | `whisper-1` instead | alternative |
-| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Event log + the voice profile that makes it sound like each person | recommended |
-| `ALLOWED_ORIGINS` | Lock the web widget to your own domains | recommended |
-| `MOCKINGBIRD_ACCESS_KEY` | Require a key on every endpoint that costs money | **read the note below** |
-| `FOLLOWUPBOSS_API_KEY` | Team-wide Follow Up Boss, so no key ever reaches a laptop | optional |
-| `CONNECTOR_ALLOWED_HOSTS` | Restrict custom connectors to hosts you name | optional |
-| `MOCKINGBIRD_LEARNING=off` | Kill the profile layer entirely | optional |
+Set `MOCKINGBIRD_PUBLIC_URL` to the canonical HTTPS origin, `MOCKINGBIRD_HUB_URL` to the actual Hub URL, and `ALLOWED_ORIGINS` to the permitted browser origins. Add Erik's **verified Clerk user ID** to `MOCKINGBIRD_ADMIN_USER_IDS`. Do not use an email or a guess for this ID.
 
-Check it:
+The Hub already has a `power_ups` row with ID `mockingbird`, currently `coming-soon`. After the live site and installers pass release gates, set its dashboard URL to `/account` on the canonical site, sales page URL to `/`, and CTA to Open Mockingbird. Preserve the Hub's existing `agent_power_ups` access model; catalog visibility is not a substitute for Pro entitlement. Users redeem gifts inside Mockingbird.
 
-```bash
-curl https://your-deployment.vercel.app/api/tools
-# {"connectors":[...],"requiresKey":false,"configured":{"transcription":true,"ai":true,"log":true,...}}
-```
+## Providers
 
-Anything `false` in `configured` is a missing environment variable. The
-deployment's own setup page (`/install`) says the same thing in plain language —
-open it in a browser and it checks itself. The root URL is the overview page you
-send to agents.
+Set `ANTHROPIC_API_KEY` and a transcription provider key. The speech provider selection order is Groq, Deepgram, OpenAI. There is no automatic cross-provider retry. Set `MOCKINGBIRD_MODEL` explicitly if choosing another supported Anthropic model; default is `claude-sonnet-4-6`. Test accuracy, numbers, proper names and latency with actual agent recordings before selecting a cheaper model.
 
-### A word about who can reach your deployment
+The speech and formatting endpoints require an active Pro entitlement and reserve a per-user daily request quota before invoking providers. Audio bodies stop at 4 MiB, below the Vercel body limit. App recordings stop at three minutes. Quotas count attempted requests, including failures; they do not record transcript text.
 
-A Vercel production URL is public. With keys configured and nothing else set,
-anyone who learns the URL can POST to `/api/format` and spend your Anthropic
-credits. `ALLOWED_ORIGINS` does not prevent this — CORS only constrains
-browsers and says nothing to `curl`.
+## Stripe
 
-Set **`MOCKINGBIRD_ACCESS_KEY`** to any long random string and every endpoint
-that costs money requires it. Clients send it as `X-Mockingbird-Key`:
+Start with test-mode keys. Create one active recurring monthly USD Price for **$15.00**. Set its ID as `STRIPE_PRICE_ID`, plus `STRIPE_SECRET_KEY` and the webhook signing secret `STRIPE_WEBHOOK_SECRET`.
 
-- **Desktop:** Settings → Access key. Give agents the key with the URL.
-- **Web apps:** `Mockingbird.init({ accessKey: '...' })`. Be clear-eyed about
-  this one — anything a page holds, its users can read. It stops passers-by,
-  it is not a secret. For a genuinely public page, proxy through your own
-  server instead.
+Register `https://<canonical-host>/api/webhook` for `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted`. The route requires raw-body signatures, retrieves current subscription state, checks customer ownership and recognized Price, and projects access into the database. Checkout success redirects do not grant access.
 
-The `GET /api/tools` health check stays open either way, so a client can ask
-whether a deployment is set up before it has been handed a key. It reports
-which variables are set, never their values.
+Enable Stripe Customer Portal subscription cancellation and payment-method management. Configure operator identity, support details and tax settings in Stripe. Verify the displayed checkout amount and recurring disclosure. Run a successful subscription, payment failure, cancellation, renewal, duplicate-event replay and out-of-order event test before changing to live keys. Live keys and live Price/webhook IDs must belong to the same Stripe account/environment.
 
-## 2. Create the tables (if you want it to remember)
+Gifted users never enter checkout to redeem. A gift does not cancel an existing paid subscription; the account UI tells them to cancel renewal in the portal if desired. Default gift creation gives one year to one recipient, claimed within 90 days. Codes are random, hashed in storage and displayed only once to the administrator.
 
-Supabase → SQL editor → paste `db/schema.sql` → run. It is idempotent, so it
-also upgrades an older install. Skip this and everything still works; it just
-starts fresh every time. See [LEARNING.md](LEARNING.md).
+## Desktop release
 
-## 3. Build the desktop app
+The workflow requires `CSC_LINK`, `CSC_KEY_PASSWORD`, `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` as GitHub Actions secrets. Signing certificates must belong to the operator. `forceCodeSigning` prevents an unsigned consumer installer from being mistaken for a signed release.
 
-```bash
-cd desktop
-npm install
-npm run dist:mac    # on a Mac  → dist/Mockingbird-1.0.0.dmg
-npm run dist:win    # on Windows → dist/"Mockingbird Setup 1.0.0.exe"
-```
+Set matching desktop package/lock versions, then push a matching version tag to build a **draft** release. Manual workflow dispatch builds artifacts without publishing a release. Both platform jobs must pass before the draft is created. The macOS DMG and ZIP, Windows EXE, blockmaps and update manifests are retained.
 
-Put the two files wherever your team gets things (shared drive, intranet page,
-a release on this repo).
+Test installation, microphone permissions, dictation, selection capture, rewrite review, paste into representative apps, retry, revocation, uninstall and updating on actual Mac and Windows machines. Publish the release after those checks. Then set `MOCKINGBIRD_MAC_DOWNLOAD_URL` and `MOCKINGBIRD_WINDOWS_DOWNLOAD_URL` to the signed release assets.
 
-**Sign them before a wide rollout.** An unsigned app that asks for Accessibility
-permission is a hard sell to a room of agents. Apple Developer ID for the DMG,
-a code-signing cert for the EXE, both configured in the `build` block of
-`desktop/package.json`.
+## Support, domain and privacy
 
-## 4. Connect your systems
+Set a monitored `MOCKINGBIRD_SUPPORT_EMAIL`. The pages describe implemented data practices, but provider retention, operator contact information and payment disclosures must be checked against the actual production configuration. The web UI loads fonts from Google Fonts; Clerk and Stripe load their own external services.
 
-- **Follow Up Boss for everyone:** set `FOLLOWUPBOSS_API_KEY` on the deployment.
-  Nobody has to paste a key, and no key sits on a laptop.
-- **Per agent instead:** they paste their own key in Settings → Connectors.
-- **Your own products:** describe their endpoints once — [CONNECTORS.md](CONNECTORS.md).
-
-## 5. Put it in the web apps
-
-One script tag per build, or hand [ADD-MOCKINGBIRD.md](ADD-MOCKINGBIRD.md) to
-Claude Code in that repo and let it do the wiring.
-
-## 6. Verify end to end
-
-```bash
-npm test    # 58 assertions: connectors, the API as Vercel invokes it,
-            # the desktop main process, and the widget in a real browser
-```
-
-A successful Vercel build should report **six** serverless functions — one per
-endpoint (`act`, `actions`, `format`, `profile`, `tools`, `transcribe`). Files
-under `api/_lib/` are shared code, and Vercel skips underscore-prefixed
-directories; if you ever see more than six, something in `_lib` has been
-renamed out of that protection.
-
-Then, by hand, once:
-
-1. Dictate into an email. Text lands, filler words gone.
-2. Say a command. A card appears; **nothing happens until you press Enter**.
-3. Press Enter. Check the record actually appeared in Follow Up Boss.
-4. `select * from mockingbird_events order by created_at desc limit 5;`
-5. Turn off wifi and dictate: you should get the raw transcript, not an error.
-
----
-
-# For agents (three steps)
-
-1. **Install it.** Open the file you were sent, drag Mockingbird to
-   Applications (Mac) or click through the installer (Windows).
-2. **Two boxes.** It opens asking for a deployment URL and your name. Paste,
-   type, Save.
-3. **Talk.** Put your cursor anywhere — an email, a text box, a CRM field —
-   press **Ctrl/Cmd+Shift+Space**, say it, press it again.
-
-To tell it to *do* something instead of typing it, press
-**Ctrl/Cmd+Shift+K**: *"add Maria Lopez, 555-0142, from the open house, and
-remind me to call her Monday."* It shows you what it's about to do; press
-**Enter** and it's done.
-
-Two permissions on a Mac, both one-time: the microphone (it asks), and
-Accessibility so the text pastes itself (**System Settings → Privacy &
-Security → Accessibility → switch on Mockingbird**). Until you do that second
-one, your words wait on the clipboard and you press Cmd+V.
-
-Nothing else. It sits in the menu bar and stays out of the way.
+No domain was purchased. Previously checked candidate: `askmockingbird.com`; availability must be checked again before buying. The selected image-edit source was missing, so this branch uses a bird emoji in the interface and keeps the previous installer icon. Final bird artwork still needs the selected source reattached or a separately approved new asset.

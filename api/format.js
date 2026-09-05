@@ -10,17 +10,23 @@
  * Request:  POST { text: string, tone?: string, appContext?: string, dictionary?: string[], user?: string }
  * Response: { text: string }
  */
-import { claude, isSetupError, MODEL, EFFORT, SETUP_MESSAGE } from './_lib/claude.js';
-import { logEvent } from './_lib/log.js';
-import { preflight } from './_lib/http.js';
-import { profileContext, maybeRefresh } from './_lib/profile.js';
-
+import {
+  claude,
+  isSetupError,
+  MODEL,
+  EFFORT,
+  SETUP_MESSAGE,
+} from "./_lib/claude.js";
+import { preflight } from "./_lib/http.js";
+import { profileContext } from "./_lib/profile.js";
 
 const TONES = {
-  clean: 'Neutral and natural — keep the speaker\'s voice, just make it read well.',
-  formal: 'Professional business writing, suitable for email to a client.',
-  casual: 'Relaxed and friendly, like a chat message. Contractions are fine.',
-  'code-comment': 'Terse technical prose suitable for a code comment or commit message.'
+  clean:
+    "Neutral and natural — keep the speaker's voice, just make it read well.",
+  formal: "Professional business writing, suitable for email to a client.",
+  casual: "Relaxed and friendly, like a chat message. Contractions are fine.",
+  "code-comment":
+    "Terse technical prose suitable for a code comment or commit message.",
 };
 
 const SYSTEM_PROMPT = `You clean up raw voice-dictation transcripts so they read like the speaker typed them.
@@ -34,15 +40,22 @@ Rules:
 - Output ONLY the cleaned text — no preamble, no quotes around it, no explanation.`;
 
 export default async function handler(req, res) {
-  if (preflight(req, res)) return;
+  if (await preflight(req, res, undefined, { paid: true, meter: "text" }))
+    return;
 
-  const { text, tone = 'clean', appContext = '', dictionary = [], user = null, learn = true } = req.body || {};
-  const startedAt = Date.now();
-  if (!text || typeof text !== 'string') {
+  const {
+    text,
+    tone = "clean",
+    appContext = "",
+    dictionary = [],
+    learn = false,
+  } = req.body || {};
+  const user = req.userId;
+  if (!text || typeof text !== "string") {
     return res.status(400).json({ error: 'Missing "text"' });
   }
   if (text.length > 20000) {
-    return res.status(413).json({ error: 'Transcript too long' });
+    return res.status(413).json({ error: "Transcript too long" });
   }
 
   // The speaker's own profile — how they write, the names they use — so the
@@ -59,46 +72,48 @@ export default async function handler(req, res) {
       system: SYSTEM_PROMPT,
       messages: [
         {
-          role: 'user',
+          role: "user",
           content:
             `Style: ${TONES[tone] || TONES.clean}\n` +
-            (appContext ? `The text is being dictated into: ${appContext}\n` : '') +
+            (appContext
+              ? `The text is being dictated into: ${String(appContext).slice(0, 500)}\n`
+              : "") +
             (Array.isArray(dictionary) && dictionary.length
-              ? `Names/terms the speaker uses (fix mishearings toward these): ${dictionary.slice(0, 200).join(', ')}\n`
-              : '') +
+              ? `Names/terms the speaker uses (fix mishearings toward these): ${dictionary
+                  .filter((x) => typeof x === "string")
+                  .slice(0, 200)
+                  .map((x) => x.slice(0, 100))
+                  .join(", ")}\n`
+              : "") +
             profileBlock +
-            `\nRaw transcript:\n${text}`
-        }
-      ]
+            `\nRaw transcript:\n${text}`,
+        },
+      ],
     });
 
-    if (response.stop_reason === 'refusal') {
+    if (
+      response.stop_reason === "refusal" ||
+      response.stop_reason === "max_tokens"
+    ) {
       // Fall back to the raw transcript rather than losing the user's words.
       return res.status(200).json({ text });
     }
 
     const cleaned = response.content
-      .filter((block) => block.type === 'text')
+      .filter((block) => block.type === "text")
       .map((block) => block.text)
-      .join('')
+      .join("")
       .trim();
 
-    logEvent({
-      app: appContext, user_id: user, kind: 'dictation',
-      raw_text: text, output_text: cleaned || text,
-      duration_ms: Date.now() - startedAt,
-      meta: { model: response.model, tone, via: 'format' }
-    });
-    maybeRefresh(user, learn);
     return res.status(200).json({ text: cleaned || text });
   } catch (err) {
-    console.error('mockingbird format error:', err);
+    console.error("mockingbird format error:", err.status || "unavailable");
     // Widget falls back to the raw transcript on any non-200 — the user's
     // words are never lost, whichever of these it is.
     // Deliberately not the upstream message: this endpoint is public, and an
     // operator needs the one sentence that tells them what to change anyway.
     return isSetupError(err)
       ? res.status(503).json({ error: SETUP_MESSAGE })
-      : res.status(502).json({ error: 'Formatting failed' });
+      : res.status(502).json({ error: "Formatting failed" });
   }
 }

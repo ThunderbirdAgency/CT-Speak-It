@@ -1,7 +1,7 @@
 {
   "name": "mockingbird",
-  "version": "4.0.0",
-  "description": "Mockingbird \u2014 talk instead of type anywhere on your machine, and tell your CRM what to do. Dictation that lands Claude-polished text at your cursor, plus voice commands executed against Follow Up Boss and any product that can describe its endpoints.",
+  "version": "5.0.0",
+  "description": "Mockingbird by Thunderbird \u2014 private, personal voice dictation with paid and sponsored Pro access.",
   "main": "src/mockingbird.js",
   "files": [
     "src",
@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "demo": "npx serve .",
-    "test": "node test/server.mjs && node test/api.mjs && node desktop/tools/smoke.js && node test/widget.cjs"
+    "test": "npm run test:consumer && node test/server.mjs",
+    "test:consumer": "node test/consumer.mjs && node desktop/tools/smoke.js && node tools/check-web.mjs",
+    "test:widget": "node test/widget.cjs"
   },
   "keywords": [
     "dictation",
@@ -23,10 +25,13 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.123.0"
+    "@anthropic-ai/sdk": "^0.123.0",
+    "@clerk/backend": "3.17.1",
+    "stripe": "22.6.1"
   },
   "type": "module",
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "playwright": "^1.56.1"
   }
 }

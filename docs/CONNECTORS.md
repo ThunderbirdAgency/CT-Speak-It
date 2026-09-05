@@ -1,3 +1,5 @@
+> Historical/experimental connector reference. Consumer action endpoints are disabled in the dictation release. This document is not a list of released capabilities.
+
 # Connectors — making Mockingbird *do* things
 
 Dictation is half of Mockingbird. The other half is that anything you can
