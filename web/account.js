@@ -412,7 +412,7 @@ for (const [id, action] of [
     const u = new URL(result.url);
     if (
       u.protocol !== "https:" ||
-      !["checkout.stripe.com", "billing.stripe.com"].includes(u.hostname)
+      !["checkout.stripe.com", "billing.stripe.com", "pay.agentpowerups.com"].includes(u.hostname)
     )
       throw new Error("Invalid billing link");
     location.assign(u.href);
