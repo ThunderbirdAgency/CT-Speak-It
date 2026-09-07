@@ -1,8 +1,24 @@
-# Mockingbird consumer release status — September 5, 2026
+# Mockingbird consumer release status — September 6, 2026
 
 Implementation branch: `finish/mockingbird-consumer`, based on `126bff9b16de5d0ee24b2a79531031d0117be824` from `claude/wispr-flow-integration-shi5x5`.
 
 **The implementation and database foundation have been advanced, but the app is not yet a verified live consumer release.** No production site promotion, real payment, domain purchase, or desktop release publication was performed.
+
+## September 6 continuation
+
+- Preserved PR #1 and `finish/mockingbird-consumer` at implementation commit `4b1e1dcca98919fd71af653304c23778738bf731`; no application code was replaced.
+- Re-ran `npm test`: all 19 consumer integration checks, 12 simulated-OS desktop checks, 8-page/66-reference web checks and 14 preserved connector checks passed. Providers and Stripe remain simulated in this suite.
+- Confirmed signed-in dashboard access to the existing Vercel project `mockingbird`, ID `prj_3yb0jFGuWdOb1mLJ7Cdy2kZ2dclF`. The connected Vercel API still returns 404, so use the authenticated dashboard rather than creating a replacement project.
+- Existing production remains `https://mockingbird-rho.vercel.app`, on `claude/wispr-flow-integration-shi5x5` at `126bff9`. The consumer preview is `https://mockingbird-git-finish-mockingbird-consumer-thunderbird-agency.vercel.app`.
+- Existing `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present for Production and Preview. Presence is not live provider/database verification; secret values were not revealed.
+- Confirmed the user-specified Clerk application `app_3IwLaU6FAETeJ1qBE1rpbmuIBkA`, development instance `ins_3IwLaYK4Cx3tSqH3K6ijcc6Rd9s`, frontend `wise-hamster-4112.clerk.accounts.dev`. Email verification is enabled. It has no production environment. This is the specified Mockingbird application; shared Hub SSO remains unverified.
+- Saved `CLERK_PUBLISHABLE_KEY` and `MOCKINGBIRD_PUBLIC_URL` as Config values scoped only to Preview branch `finish/mockingbird-consumer`. Existing-source preview redeploy `9PhF26X6xPkw4hv22dQrQuPWJyJg` reached Ready. The account page now renders the Mockingbird Clerk sign-in form with Google and email options in development mode. This verifies frontend wiring, not a completed authenticated account session.
+- `CLERK_SECRET_KEY`, `CLERK_AUTHORIZED_PARTIES`, the verified admin allowlist, Stripe configuration, support/Hub URLs and download URLs are still missing. Approval was requested to transfer the existing Clerk secret directly into encrypted Vercel Preview settings, without pasting it into chat.
+- The connected Stripe account is ThunderBird Agency (`acct_1MGGhdBk08Px6wM1`) in test mode. Account selection was requested before account-specific setup; no Stripe product, subscription or payment was created.
+- GitHub Releases has no releases. The repository's Actions settings show no repository or environment secrets, so the required Apple/Windows signing and notarization credentials are not configured.
+- External HTTP checks of the preview encounter Vercel Deployment Protection (401) before reaching the app. These responses do not prove application authorization. Plan authenticated browser checks and a deliberately configured Stripe webhook delivery path; do not silently disable protection.
+
+Next: complete preview Clerk configuration, redeploy and verify actual sign-in; verify Erik's Clerk ID before allowing gift administration; exercise gift issuance/redemption, actual dictation and device pairing; configure the selected Stripe test account and verify the billing lifecycle; obtain operator-owned signing credentials and perform real Mac/Windows acceptance. Confirm the production domain and monitored support address before production configuration and promotion.
 
 ## Implemented
 
@@ -34,9 +50,9 @@ The Supabase advisor reports informational [RLS without policies](https://supaba
 
 | Dependency | Evidence / next action |
 | --- | --- |
-| Existing Vercel project access | The connected Thunderbird team returned no projects; looking up `mockingbird` returned 404. Reconnect/authorize access to the existing project. Do not replace it with a new deployment just to bypass this boundary. |
+| Existing Vercel project access | Resolved through the signed-in dashboard on September 6; connected API still returns 404. Use the existing project and preview branch. |
 | Canonical hostname | Confirm the production URL; no domain was bought. `askmockingbird.com` was a previously checked candidate, not a reserved domain. |
-| Hub/Clerk production configuration | Configure Mockingbird's frontend domain with the Hub identity tenant, the authorized origins, and Erik's verified Clerk admin ID. Verify actual sign-in and device pairing. |
+| Hub/Clerk production configuration | The specified Mockingbird Clerk development app is accessible; its public key is saved for the consumer preview. Complete secret/origin/admin configuration, establish production identity/domain settings, and verify actual sign-in, Hub SSO and device pairing. |
 | Provider configuration and evaluation | Confirm working speech/Anthropic keys; test actual audio, agent vocabulary, accuracy, latency and usage costs. Daily limits are not a promise that every user is profitable at $15. Evaluate costs before broadly issuing sponsored seats. |
 | Stripe account and webhook | Configure test keys, the matching $15 Price, webhook, portal and business details. Verify checkout/renewal/failure/cancellation with Stripe, then switch to live configuration. No real checkout was opened or charged here. |
 | Desktop signing and real hardware | Add operator-owned Mac/Windows signing credentials and Apple notarization credentials. Build a draft, test on real Macs and Windows PCs, then publish. Clipboard focus, selection behavior, permissions and updater behavior cannot be proven by OS mocks. |
