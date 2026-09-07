@@ -197,7 +197,7 @@ globalThis.fetch = async (input, init = {}) => {
           type: "recurring",
           recurring: { interval: "month", interval_count: 1 },
           currency: "usd",
-          unit_amount: 1500,
+          unit_amount: 2500,
         });
       if (u.pathname === "/v1/customers")
         return response({

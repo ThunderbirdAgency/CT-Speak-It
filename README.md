@@ -9,7 +9,7 @@ This branch implements the consumer dictation release. It is **not a declaration
 - Mac / Windows Electron app: activate a shortcut, speak, then press again to insert text.
 - Separate selected-text rewrite shortcut, with a review before replacement.
 - Web workspace for recording, rewriting, and copying, including compatible mobile browsers.
-- Pro: $15 USD/month through Stripe, or the same access covered by a gift code.
+- Pro: $25 USD/month through Stripe, or the same access covered by a gift code.
 - Gift administration: duration, recipient limits, expiry, claim counts, revocation of new claims.
 - Clerk identity shared with the Hub; single-use desktop pairing and revocable 30-day sessions.
 - Optional, editable writing preferences. User-provided samples generate unsaved suggestions for review.

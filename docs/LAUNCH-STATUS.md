@@ -24,7 +24,7 @@ Next: complete preview Clerk configuration, redeploy and verify actual sign-in; 
 
 - Consumer marketing, setup/download, account, help, privacy and product terms pages.
 - Clerk-verified ownership, Pro entitlement checks and daily usage gates before paid provider calls.
-- Stripe-hosted subscription checkout and customer portal, strict server-selected $15 monthly USD price, customer ownership, signed raw-body subscription webhooks and duplicate/out-of-order projection handling.
+- Stripe-hosted subscription checkout and customer portal, strict server-selected $25 monthly USD price, customer ownership, signed raw-body subscription webhooks and duplicate/out-of-order projection handling.
 - Gift issuance for allowlisted administrators; random hashed codes, recipient limits, claim expiry, gift duration, idempotent redemption, and revocation of future claims. Paid and gifted users unlock the same functions; gifts never auto-start billing.
 - Optional user-approved vocabulary/style/phrases; sample-based suggestions returned for review. Export/erase controls, no automatic profiling and no server transcript archive.
 - Exact spoken saved responses, web recording/rewrite workspace and mobile-browser copy workflow.
@@ -53,8 +53,8 @@ The Supabase advisor reports informational [RLS without policies](https://supaba
 | Existing Vercel project access | Resolved through the signed-in dashboard on September 6; connected API still returns 404. Use the existing project and preview branch. |
 | Canonical hostname | Confirm the production URL; no domain was bought. `askmockingbird.com` was a previously checked candidate, not a reserved domain. |
 | Hub/Clerk production configuration | The specified Mockingbird Clerk development app is accessible; its public key is saved for the consumer preview. Complete secret/origin/admin configuration, establish production identity/domain settings, and verify actual sign-in, Hub SSO and device pairing. |
-| Provider configuration and evaluation | Confirm working speech/Anthropic keys; test actual audio, agent vocabulary, accuracy, latency and usage costs. Daily limits are not a promise that every user is profitable at $15. Evaluate costs before broadly issuing sponsored seats. |
-| Stripe account and webhook | Configure test keys, the matching $15 Price, webhook, portal and business details. Verify checkout/renewal/failure/cancellation with Stripe, then switch to live configuration. No real checkout was opened or charged here. |
+| Provider configuration and evaluation | Confirm working speech/Anthropic keys; test actual audio, agent vocabulary, accuracy, latency and usage costs. Daily limits are not a promise that every user is profitable at $25. Evaluate costs before broadly issuing sponsored seats. |
+| Stripe account and webhook | Configure test keys, the matching $25 Price, webhook, portal and business details. Verify checkout/renewal/failure/cancellation with Stripe, then switch to live configuration. No real checkout was opened or charged here. |
 | Desktop signing and real hardware | Add operator-owned Mac/Windows signing credentials and Apple notarization credentials. Build a draft, test on real Macs and Windows PCs, then publish. Clipboard focus, selection behavior, permissions and updater behavior cannot be proven by OS mocks. |
 | Downloads and Hub links | Configure URLs only after verified artifacts are published. Hub already contains Mockingbird as Coming Soon; update its public/dashboard links and status after release gates pass. |
 | Support and final policy details | Supply a monitored support email and verify operator identity, provider retention and billing disclosures against real account settings. |

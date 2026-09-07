@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       name: "Mockingbird",
       plan: {
         name: "Pro",
-        amount: 15,
+        amount: 25,
         currency: "USD",
         interval: "month",
         billingReady,

@@ -32,10 +32,10 @@ export async function configuredPrice() {
     p.recurring.interval !== "month" ||
     p.recurring.interval_count !== 1 ||
     p.currency !== "usd" ||
-    p.unit_amount !== 1500
+    p.unit_amount !== 2500
   )
     throw new Error(
-      "Configure the $15 USD monthly Pro price before enabling checkout.",
+      "Configure the $25 USD monthly Pro price before enabling checkout.",
     );
   return p;
 }

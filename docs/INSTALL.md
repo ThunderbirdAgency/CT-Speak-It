@@ -26,7 +26,7 @@ The speech and formatting endpoints require an active Pro entitlement and reserv
 
 ## Stripe
 
-Start with test-mode keys. Create one active recurring monthly USD Price for **$15.00**. Set its ID as `STRIPE_PRICE_ID`, plus `STRIPE_SECRET_KEY` and the webhook signing secret `STRIPE_WEBHOOK_SECRET`.
+Start with test-mode keys. Create one active recurring monthly USD Price for **$25.00**. Set its ID as `STRIPE_PRICE_ID`, plus `STRIPE_SECRET_KEY` and the webhook signing secret `STRIPE_WEBHOOK_SECRET`.
 
 Register `https://<canonical-host>/api/webhook` for `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted`. The route requires raw-body signatures, retrieves current subscription state, checks customer ownership and recognized Price, and projects access into the database. Checkout success redirects do not grant access.
 
