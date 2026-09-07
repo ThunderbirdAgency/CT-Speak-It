@@ -1,318 +1,268 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Mockingbird</title>
-<style>
-  :root {
-    --ink: #e8ecf1;
-    --muted: rgba(232, 236, 241, .55);
-    --glass: rgba(13, 17, 23, .9);
-    --line: rgba(255, 255, 255, .07);
-    --listen: #e04545;
-    --command: #6ea8fe;
-    --work: #8d6ee8;
-    --ok: #3fbf78;
-    --warn: #d9a521;
-  }
-  html, body {
-    margin: 0; height: 100%; background: transparent; overflow: hidden;
-    user-select: none; cursor: default;
-    font: 500 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
-    color: var(--ink);
-  }
-  /* Everything hangs off the bottom of the window so the pill grows upward
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src blob:; connect-src 'none'"
+    />
+    <meta charset="utf-8" />
+    <title>Mockingbird</title>
+    <style>
+      :root {
+        --ink: #e8ecf1;
+        --muted: rgba(232, 236, 241, 0.55);
+        --glass: rgba(13, 17, 23, 0.9);
+        --line: rgba(255, 255, 255, 0.07);
+        --listen: #e04545;
+        --command: #6ea8fe;
+        --work: #8d6ee8;
+        --ok: #3fbf78;
+        --warn: #d9a521;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        user-select: none;
+        cursor: default;
+        font:
+          500 13px/1.45 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        color: var(--ink);
+      }
+      /* Everything hangs off the bottom of the window so the pill grows upward
      into a card without the window ever moving. */
-  body { display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; box-sizing: border-box; }
+      body {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        padding: 8px;
+        box-sizing: border-box;
+      }
 
-  .card {
-    width: 100%;
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(1.5);
-    backdrop-filter: blur(18px) saturate(1.5);
-    border-radius: 18px;
-    box-shadow: 0 10px 34px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.09), inset 0 0 0 1px var(--line);
-    overflow: hidden;
-    transform: translateY(6px) scale(.985);
-    opacity: 0;
-    transition: opacity .18s ease, transform .3s cubic-bezier(.2, 1.4, .4, 1);
-  }
-  .card.in { opacity: 1; transform: none; }
+      .card {
+        width: 100%;
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(18px) saturate(1.5);
+        backdrop-filter: blur(18px) saturate(1.5);
+        border-radius: 18px;
+        box-shadow:
+          0 10px 34px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.09),
+          inset 0 0 0 1px var(--line);
+        overflow: hidden;
+        transform: translateY(6px) scale(0.985);
+        opacity: 0;
+        transition:
+          opacity 0.18s ease,
+          transform 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+      }
+      .card.in {
+        opacity: 1;
+        transform: none;
+      }
 
-  .row { display: flex; align-items: center; gap: 12px; padding: 15px 18px; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--listen); }
-  .listening .dot { animation: pulse 1.5s ease infinite; }
-  .command .dot { background: var(--command); }
-  .working .dot { background: var(--work); animation: none; }
-  .done .dot { background: var(--ok); animation: none; }
-  .error .dot { background: var(--warn); animation: none; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.3); opacity: .6 } }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 18px;
+      }
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex: none;
+        background: var(--listen);
+      }
+      .listening .dot {
+        animation: pulse 1.5s ease infinite;
+      }
+      .command .dot {
+        background: var(--command);
+      }
+      .working .dot {
+        background: var(--work);
+        animation: none;
+      }
+      .done .dot {
+        background: var(--ok);
+        animation: none;
+      }
+      .error .dot {
+        background: var(--warn);
+        animation: none;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.3);
+          opacity: 0.6;
+        }
+      }
 
-  .bars { display: inline-flex; gap: 3px; align-items: center; height: 20px; flex: none; }
-  .bars i { width: 3.5px; height: 5px; border-radius: 2px; background: #ff9d94; transition: height .07s ease; }
-  .command .bars i { background: #a9caff; }
-  .working .bars, .done .bars, .error .bars { display: none; }
+      .bars {
+        display: inline-flex;
+        gap: 3px;
+        align-items: center;
+        height: 20px;
+        flex: none;
+      }
+      .bars i {
+        width: 3.5px;
+        height: 5px;
+        border-radius: 2px;
+        background: #ff9d94;
+        transition: height 0.07s ease;
+      }
+      .command .bars i {
+        background: #a9caff;
+      }
+      .working .bars,
+      .done .bars,
+      .error .bars {
+        display: none;
+      }
 
-  .label { flex: 1; min-width: 0; }
-  .label .line1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .label .line2 {
-    margin-top: 3px; color: var(--muted); font-weight: 400; font-size: 12px;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .muted { color: var(--muted); font-weight: 400; }
-  .keys { flex: none; color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
-  kbd {
-    font: inherit; padding: 1px 5px; border-radius: 5px;
-    background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px var(--line);
-  }
+      .label {
+        flex: 1;
+        min-width: 0;
+      }
+      .label .line1 {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .label .line2 {
+        margin-top: 3px;
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .muted {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .keys {
+        flex: none;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 400;
+        white-space: nowrap;
+      }
+      kbd {
+        font: inherit;
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
 
-  /* --- confirmation --- */
-  .actions { border-top: 1px solid var(--line); max-height: 150px; overflow-y: auto; }
-  .action { padding: 11px 18px; border-bottom: 1px solid var(--line); }
-  .action:last-child { border-bottom: none; }
-  .action .title { display: flex; align-items: baseline; gap: 8px; }
-  .action .verb { text-transform: capitalize; }
-  .action .where {
-    font-size: 11px; font-weight: 400; color: var(--muted);
-    padding: 1px 7px; border-radius: 999px; background: rgba(110,168,254,.14); color: #a9caff;
-  }
-  .fields { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; font-weight: 400; }
-  .fields dt { color: var(--muted); }
-  .fields dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .footer {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 10px 18px; border-top: 1px solid var(--line); background: rgba(255,255,255,.02);
-    font-size: 12px; font-weight: 400; color: var(--muted);
-  }
-  .hidden { display: none; }
-</style>
-</head>
-<body>
-  <div class="card" id="card">
-    <div class="row" id="row">
-      <div class="dot"></div>
-      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="label">
-        <div class="line1" id="line1">Listening…</div>
-        <div class="line2 hidden" id="line2"></div>
+      /* --- confirmation --- */
+      .actions {
+        padding: 16px;
+        user-select: text;
+        border-top: 1px solid var(--line);
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      .action {
+        padding: 11px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .action:last-child {
+        border-bottom: none;
+      }
+      .action .title {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .action .verb {
+        text-transform: capitalize;
+      }
+      .action .where {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--muted);
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: rgba(110, 168, 254, 0.14);
+        color: #a9caff;
+      }
+      .fields {
+        margin: 6px 0 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 10px;
+        font-size: 12px;
+        font-weight: 400;
+      }
+      .fields dt {
+        color: var(--muted);
+      }
+      .fields dd {
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 18px;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--muted);
+      }
+      button {
+        padding: 9px 14px;
+        margin: 10px 8px 0 0;
+        border-radius: 10px;
+        border: 1px solid #596779;
+        background: #243653;
+        color: white;
+        cursor: pointer;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card">
+      <div class="row" id="row">
+        <div class="dot"></div>
+        <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="label">
+          <div class="line1" id="line1">Listening…</div>
+          <div class="line2 hidden" id="line2"></div>
+        </div>
+        <div class="keys" id="keys"></div>
       </div>
-      <div class="keys" id="keys"></div>
+      <div class="actions hidden" id="actions"></div>
+      <div class="footer hidden" id="footer">
+        <span id="footerText">Review before replacing</span>
+        <span><kbd>↵</kbd> accept &nbsp; <kbd>esc</kbd> cancel</span>
+      </div>
     </div>
-    <div class="actions hidden" id="actions"></div>
-    <div class="footer hidden" id="footer">
-      <span id="footerText">Press Enter to run this</span>
-      <span><kbd>↵</kbd> run &nbsp; <kbd>esc</kbd> cancel</span>
-    </div>
-  </div>
 
-<script>
-(function () {
-  var card = document.getElementById('card');
-  var row = document.getElementById('row');
-  var line1 = document.getElementById('line1');
-  var line2 = document.getElementById('line2');
-  var keys = document.getElementById('keys');
-  var barsEl = document.getElementById('bars');
-  var bars = barsEl.children;
-  var actionsEl = document.getElementById('actions');
-  var footer = document.getElementById('footer');
-  var footerText = document.getElementById('footerText');
-
-  var mode = 'dictation';
-  var recorder = null, chunks = [], stream = null, meter = null, autoStopTimer = null;
-  var confirming = false;
-
-  function show() { requestAnimationFrame(function () { card.classList.add('in'); }); }
-
-  function paint(state, message, detail, keyHint) {
-    card.className = 'card in ' + state + (mode === 'command' && state === 'listening' ? ' command' : '');
-    line1.textContent = message || '';
-    line1.className = 'line1' + (state === 'listening' ? ' muted' : '');
-    if (detail) { line2.textContent = detail; line2.classList.remove('hidden'); }
-    else line2.classList.add('hidden');
-    keys.innerHTML = keyHint || '';
-  }
-
-  function clearConfirm() {
-    confirming = false;
-    actionsEl.classList.add('hidden');
-    footer.classList.add('hidden');
-    actionsEl.innerHTML = '';
-  }
-
-  // --------------------------------------------------------------- capture
-
-  function startMeter(src) {
-    try {
-      var ctx = new AudioContext();
-      var analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = .75;
-      ctx.createMediaStreamSource(src).connect(analyser);
-      var data = new Uint8Array(analyser.frequencyBinCount);
-      meter = { ctx: ctx, raf: 0, quietSince: Date.now() };
-      var tick = function () {
-        if (!meter) return;
-        analyser.getByteFrequencyData(data);
-        var sum = 0;
-        for (var i = 2; i < 40; i++) sum += data[i];
-        var level = Math.min(1, (sum / 38) / 140);
-        for (var b = 0; b < bars.length; b++) {
-          var weight = .55 + .45 * Math.sin((b + 1) * 1.7 + Date.now() / 90);
-          bars[b].style.height = Math.max(4, Math.round(4 + level * weight * 16)) + 'px';
-        }
-        if (level > .06) meter.quietSince = Date.now();
-        meter.raf = requestAnimationFrame(tick);
-      };
-      meter.raf = requestAnimationFrame(tick);
-    } catch (e) { /* the meter is decorative — never block dictation for it */ }
-  }
-
-  function stopMeter() {
-    if (!meter) return;
-    cancelAnimationFrame(meter.raf);
-    try { meter.ctx.close(); } catch (e) {}
-    meter = null;
-  }
-
-  function begin(payload) {
-    mode = (payload && payload.mode) || 'dictation';
-    clearConfirm();
-    show();
-    paint('listening', mode === 'command'
-      ? 'Listening for a command…'
-      : 'Listening…', '', '<kbd>' + (payload.hotkey || '') + '</kbd> to finish');
-
-    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
-      .then(function (s) {
-        stream = s;
-        chunks = [];
-        recorder = new MediaRecorder(s, MediaRecorder.isTypeSupported('audio/webm')
-          ? { mimeType: 'audio/webm' } : {});
-        recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-        recorder.onstop = function () { deliverAudio(); };
-        recorder.start();
-        window.mb.recordingStarted();
-        startMeter(s);
-        if (payload.autoStopSeconds > 0) {
-          autoStopTimer = setInterval(function () {
-            if (meter && Date.now() - meter.quietSince > payload.autoStopSeconds * 1000) finish();
-          }, 300);
-        }
-      })
-      .catch(function () {
-        paint('error', 'Microphone access denied',
-          'Allow the microphone for Mockingbird in your system privacy settings.');
-      });
-  }
-
-  function teardown() {
-    if (autoStopTimer) { clearInterval(autoStopTimer); autoStopTimer = null; }
-    stopMeter();
-    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
-  }
-
-  function finish() {
-    if (!recorder || recorder.state !== 'recording') return;
-    if (autoStopTimer) { clearInterval(autoStopTimer); autoStopTimer = null; }
-    recorder.stop();
-  }
-
-  function cancel(options) {
-    if (recorder && recorder.state === 'recording') { recorder.onstop = null; recorder.stop(); }
-    teardown();
-    clearConfirm();
-    // A silent cancel comes from main (switching modes) and has already been
-    // accounted for there; anything else is the user pressing Escape.
-    if (!options || !options.silent) window.mb.cancelled();
-  }
-
-  function deliverAudio() {
-    teardown();
-    paint('working', 'Transcribing…');
-    var blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || 'audio/webm' });
-    blob.arrayBuffer().then(function (buf) {
-      window.mb.sendAudio(new Uint8Array(buf), mode);
-    });
-  }
-
-  // --------------------------------------------------------------- confirm
-
-  function renderConfirm(payload) {
-    confirming = true;
-    var list = payload.actions || [];
-    paint('working', list.length > 1 ? list.length + ' things to do' : 'Ready to do this',
-      payload.transcript, '');
-    actionsEl.innerHTML = '';
-    list.forEach(function (action) {
-      var item = document.createElement('div');
-      item.className = 'action';
-
-      var title = document.createElement('div');
-      title.className = 'title';
-      var verb = document.createElement('span');
-      verb.className = 'verb';
-      verb.textContent = action.label;
-      title.appendChild(verb);
-      if (action.connector) {
-        var where = document.createElement('span');
-        where.className = 'where';
-        where.textContent = action.connector;
-        title.appendChild(where);
-      }
-      item.appendChild(title);
-
-      if (action.fields && action.fields.length) {
-        var dl = document.createElement('dl');
-        dl.className = 'fields';
-        action.fields.forEach(function (f) {
-          var dt = document.createElement('dt');
-          dt.textContent = f.key;
-          var dd = document.createElement('dd');
-          dd.textContent = f.value;
-          dl.appendChild(dt);
-          dl.appendChild(dd);
-        });
-        item.appendChild(dl);
-      }
-      actionsEl.appendChild(item);
-    });
-    footerText.textContent = list.length > 1
-      ? 'Enter runs all ' + list.length
-      : 'Enter runs it';
-    actionsEl.classList.remove('hidden');
-    footer.classList.remove('hidden');
-    show();
-    window.focus();
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (confirming) {
-      if (e.key === 'Enter') { e.preventDefault(); clearConfirm(); window.mb.confirm(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); clearConfirm(); window.mb.confirm(false); }
-      return;
-    }
-    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-  });
-
-  // Clicking the pill while it is listening finishes, the way the mic button
-  // does in the web widget.
-  row.addEventListener('click', function () {
-    if (recorder && recorder.state === 'recording') finish();
-  });
-
-  // ------------------------------------------------------------- main wiring
-
-  window.mb.onListen(begin);
-  window.mb.onStop(finish);
-  window.mb.onCancel(cancel);
-  window.mb.onConfirm(renderConfirm);
-  window.mb.onStatus(function (payload) {
-    if (confirming && payload.state === 'working') clearConfirm();
-    if (payload.state === 'idle') { clearConfirm(); return; }
-    paint(payload.state, payload.message, payload.detail, '');
-  });
-})();
-</script>
-</body>
+    <script src="overlay.js"></script>
+  </body>
 </html>

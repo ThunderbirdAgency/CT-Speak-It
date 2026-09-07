@@ -1,151 +1,231 @@
-/**
- * Mockingbird Desktop — main process.
- *
- * Voice everywhere on your machine, in two shapes:
- *
- *   Dictation hotkey (Ctrl/Cmd+Shift+Space) — speak into any app, press again,
- *   polished text is pasted where your cursor is. Email, Word, Slack, a CRM
- *   text box, anything.
- *
- *   Command hotkey (Ctrl/Cmd+Shift+K) — speak an instruction instead. "Add
- *   Maria Lopez, 555-0142, from the open house, and remind me to call her
- *   Monday." Mockingbird shows exactly what it is about to do; press Enter and
- *   it happens in Follow Up Boss / your CRM. Escape cancels.
- *
- * Everything that touches the network or a credential happens here in the main
- * process. The overlay window only records audio and draws the pill — it never
- * sees an API key.
- */
+/** Consumer desktop: verified device sessions, dictation and reviewed rewrites. */
 const {
-  app, BrowserWindow, Tray, Menu, globalShortcut, session,
-  clipboard, ipcMain, screen, shell, nativeImage, Notification
-} = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { execFile } = require('child_process');
-
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  globalShortcut,
+  session,
+  clipboard,
+  ipcMain,
+  screen,
+  shell,
+  nativeImage,
+  Notification,
+  safeStorage,
+  systemPreferences,
+} = require("electron");
+const path = require("path");
+const fs = require("fs");
+const { execFile } = require("child_process");
+const { randomUUID } = require("crypto");
+const { autoUpdater } = require("electron-updater");
 const DEFAULT_CONFIG = {
-  baseUrl: '',                                    // your Mockingbird deployment
-  accessKey: '',                                  // if the deployment requires one
-  userId: '',                                     // who is speaking (for the event log + profile)
-  dictationHotkey: 'CommandOrControl+Shift+Space',
-  commandHotkey: 'CommandOrControl+Shift+K',
-  tone: 'clean',
-  lang: 'en-US',
-  autoPaste: true,        // simulate the paste keystroke (off = clipboard only)
-  confirmActions: true,   // show what will happen and wait for Enter
-  smartCommands: true,    // notice commands spoken with the dictation hotkey too
-  learn: true,            // let Mockingbird build a voice profile (see docs/LEARNING.md)
+  baseUrl: "",
+  dictationHotkey: "CommandOrControl+Shift+Space",
+  rewriteHotkey: "CommandOrControl+Shift+R",
+  tone: "clean",
+  lang: "en-US",
+  autoPaste: true,
+  learn: false,
+  keepHistory: false,
   launchAtLogin: true,
-  autoStopSeconds: 0,     // finish automatically after N seconds of silence (0 = off)
+  autoStopSeconds: 0,
   dictionary: [],
-  connectors: []          // [{ id, type, label, enabled, credentials, config }]
 };
-
-const HISTORY_LIMIT = 200;
-
-let overlay = null;
-let settingsWindow = null;
-let tray = null;
-let listening = false;
-let currentMode = 'dictation';
-let pendingConfirm = null;   // { actions, transcript } awaiting Enter
-
-// ---------------------------------------------------------------- storage
-
-const configPath = () => path.join(app.getPath('userData'), 'config.json');
-const historyPath = () => path.join(app.getPath('userData'), 'history.json');
-
+let overlay,
+  settingsWindow,
+  tray,
+  active = null,
+  lastRecording = null,
+  hideTimer,
+  updateReady = false;
+const configPath = () => path.join(app.getPath("userData"), "config.json");
+const historyPath = () => path.join(app.getPath("userData"), "history.json");
+const authPath = () => path.join(app.getPath("userData"), "session.bin");
 function loadConfig() {
   try {
-    const stored = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
-    return Object.assign({}, DEFAULT_CONFIG, stored);
-  } catch (e) {
-    return Object.assign({}, DEFAULT_CONFIG);
-  }
-}
-
-function saveConfig(patch) {
-  const next = Object.assign(loadConfig(), patch || {});
-  try {
-    fs.mkdirSync(app.getPath('userData'), { recursive: true });
-    fs.writeFileSync(configPath(), JSON.stringify(next, null, 2));
-  } catch (err) {
-    console.error('mockingbird: could not save config', err.message);
-  }
-  applyConfig(next);
-  return next;
-}
-
-function loadHistory() {
-  try { return JSON.parse(fs.readFileSync(historyPath(), 'utf8')); } catch (e) { return []; }
-}
-
-/** Local, on this machine only — the "what did I just say?" list in the app. */
-function pushHistory(entry) {
-  const history = loadHistory();
-  history.unshift(Object.assign({ at: new Date().toISOString() }, entry));
-  try {
-    fs.writeFileSync(historyPath(), JSON.stringify(history.slice(0, HISTORY_LIMIT), null, 2));
-  } catch (err) {
-    console.error('mockingbird: could not save history', err.message);
-  }
-  if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send('mb:history-changed');
-}
-
-function setupComplete(cfg) {
-  return Boolean(cfg.baseUrl && /^https?:\/\//.test(cfg.baseUrl));
-}
-
-function enabledConnectors(cfg) {
-  return (cfg.connectors || [])
-    .filter((c) => c && c.enabled !== false && c.type)
-    .map((c) => ({
-      type: c.type,
-      id: c.id || c.type,
-      label: c.label,
-      credentials: c.credentials || {},
-      config: c.config || {}
-    }));
-}
-
-// -------------------------------------------------------------------- api
-
-async function api(pathname, { method = 'POST', body, headers = {}, timeoutMs = 45000 } = {}) {
-  const cfg = loadConfig();
-  if (!setupComplete(cfg)) throw new Error('Mockingbird is not set up yet — open Settings and add your deployment URL.');
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const r = await fetch(cfg.baseUrl.replace(/\/$/, '') + pathname, {
-      method,
-      headers: Object.assign(
-        body instanceof Buffer ? {} : { 'Content-Type': 'application/json' },
-        cfg.accessKey ? { 'X-Mockingbird-Key': cfg.accessKey } : {},
-        headers
+    const s = JSON.parse(fs.readFileSync(configPath(), "utf8"));
+    return {
+      ...DEFAULT_CONFIG,
+      ...Object.fromEntries(
+        Object.keys(DEFAULT_CONFIG)
+          .filter((k) => k in s)
+          .map((k) => [k, s[k]]),
       ),
-      body: body instanceof Buffer ? body : body ? JSON.stringify(body) : undefined,
-      signal: controller.signal
-    });
-    const text = await r.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
-    if (!r.ok) throw new Error((data && data.error) || `${pathname} failed (${r.status})`);
-    return data;
-  } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Mockingbird timed out — check your connection.');
-    throw err;
-  } finally {
-    clearTimeout(timer);
+    };
+  } catch {
+    return { ...DEFAULT_CONFIG };
   }
 }
-
-// ---------------------------------------------------------------- overlay
-
+function secureAvailable() {
+  return (
+    safeStorage.isEncryptionAvailable() &&
+    safeStorage.getSelectedStorageBackend?.() !== "basic_text"
+  );
+}
+function readAuth() {
+  try {
+    return secureAvailable()
+      ? JSON.parse(safeStorage.decryptString(fs.readFileSync(authPath())))
+      : null;
+  } catch {
+    return null;
+  }
+}
+function writeAuth(value) {
+  if (!secureAvailable())
+    throw new Error(
+      "Secure system credential storage is unavailable. Unlock your system keychain and try again.",
+    );
+  fs.mkdirSync(app.getPath("userData"), { recursive: true });
+  fs.writeFileSync(
+    authPath(),
+    safeStorage.encryptString(JSON.stringify(value)),
+    { mode: 0o600 },
+  );
+}
+function saveConfig(patch) {
+  const next = { ...loadConfig() };
+  for (const k of Object.keys(DEFAULT_CONFIG))
+    if (k in patch) next[k] = patch[k];
+  next.baseUrl = loadConfig().baseUrl; // Only a successfully exchanged connection code can set the server.
+  for (const k of ["autoPaste", "learn", "keepHistory", "launchAtLogin"])
+    next[k] = Boolean(next[k]);
+  for (const k of ["dictationHotkey", "rewriteHotkey"])
+    if (typeof next[k] !== "string" || next[k].length > 100)
+      throw new Error("Invalid shortcut");
+  if (!["clean", "formal", "casual", "code-comment"].includes(next.tone))
+    next.tone = "clean";
+  next.lang = String(next.lang).slice(0, 20);
+  next.autoStopSeconds = Math.min(
+    20,
+    Math.max(0, Number(next.autoStopSeconds) || 0),
+  );
+  next.dictionary = Array.isArray(next.dictionary)
+    ? next.dictionary
+        .filter((x) => typeof x === "string")
+        .slice(0, 200)
+        .map((x) => x.slice(0, 100))
+    : [];
+  fs.mkdirSync(app.getPath("userData"), { recursive: true });
+  fs.writeFileSync(configPath(), JSON.stringify(next, null, 2), {
+    mode: 0o600,
+  });
+  applyConfig(next);
+  return publicConfig();
+}
+function publicConfig() {
+  return {
+    ...loadConfig(),
+    connected: Boolean(readAuth()),
+    sessionExpiresAt: readAuth()?.expiresAt || null,
+    canRetry: Boolean(lastRecording),
+    updateReady,
+    version: app.getVersion(),
+  };
+}
+function loadHistory() {
+  try {
+    return JSON.parse(fs.readFileSync(historyPath(), "utf8"));
+  } catch {
+    return [];
+  }
+}
+function pushHistory(entry) {
+  if (!loadConfig().keepHistory) return;
+  fs.writeFileSync(
+    historyPath(),
+    JSON.stringify(
+      [{ at: new Date().toISOString(), ...entry }, ...loadHistory()].slice(
+        0,
+        200,
+      ),
+    ),
+    { mode: 0o600 },
+  );
+  settingsWindow?.webContents.send("mb:history-changed");
+}
+function notify(title, body) {
+  try {
+    new Notification({ title, body }).show();
+  } catch {}
+}
+function trustedURL(value) {
+  const u = new URL(value);
+  if (
+    u.protocol !== "https:" ||
+    u.username ||
+    u.password ||
+    u.pathname !== "/" ||
+    u.search
+  )
+    throw new Error("Use the connection code from your Mockingbird account.");
+  return u.origin;
+}
+async function api(
+  route,
+  { body, raw = false, method = "POST", baseUrl, token, signal } = {},
+) {
+  const cfg = loadConfig();
+  const base = trustedURL(baseUrl || cfg.baseUrl);
+  const auth = token === undefined ? readAuth()?.token : token;
+  const r = await fetch(base + route, {
+    method,
+    redirect: "error",
+    headers: {
+      ...(auth ? { Authorization: "Bearer " + auth } : {}),
+      "Content-Type": raw ? "audio/webm" : "application/json",
+      "X-Mockingbird-Lang": cfg.lang,
+    },
+    body: body ? (raw ? body : JSON.stringify(body)) : undefined,
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(45000)])
+      : AbortSignal.timeout(45000),
+  });
+  let data;
+  try {
+    data = await r.json();
+  } catch {
+    throw new Error(
+      "The service did not return a valid response. Please try again.",
+    );
+  }
+  if (!r.ok)
+    throw new Error(data.error || "The request failed. Please try again.");
+  return data;
+}
+function send(channel, payload) {
+  if (overlay && !overlay.isDestroyed())
+    overlay.webContents.send(channel, payload);
+}
+function status(state, message, detail) {
+  send("mb:status", { state, message, detail });
+}
+function hideSoon(ms = 1800) {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (!active) overlay?.hide();
+  }, ms);
+}
+function positionOverlay() {
+  const { workArea } = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint(),
+  );
+  const [w, h] = overlay.getSize();
+  overlay.setPosition(
+    Math.round(workArea.x + workArea.width - w - 16),
+    Math.round(workArea.y + workArea.height - h - 16),
+  );
+}
+function lockWindow(win) {
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
+}
 function createOverlay() {
   overlay = new BrowserWindow({
-    width: 460,
-    height: 260,
+    width: 520,
+    height: 480,
     frame: false,
     transparent: true,
     resizable: false,
@@ -155,538 +235,499 @@ function createOverlay() {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
-    focusable: true,        // needed for Enter-to-confirm; we only focus on demand
     hasShadow: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
+  lockWindow(overlay);
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlay.setAlwaysOnTop(true, 'screen-saver');
-  overlay.loadFile(path.join(__dirname, 'overlay.html'));
-  positionOverlay();
+  overlay.loadFile(path.join(__dirname, "overlay.html"));
 }
-
-function positionOverlay() {
-  if (!overlay) return;
-  const cursor = screen.getCursorScreenPoint();
-  const { workArea } = screen.getDisplayNearestPoint(cursor);
-  const [w, h] = overlay.getSize();
-  overlay.setPosition(
-    Math.round(workArea.x + workArea.width - w - 16),
-    Math.round(workArea.y + workArea.height - h - 16)
+function restoreFocus() {
+  if (process.platform === "darwin") app.hide();
+  else {
+    overlay?.hide();
+    settingsWindow?.blur();
+  }
+}
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+function keypress(key) {
+  return new Promise((resolve, reject) => {
+    const done = (err) =>
+      err
+        ? reject(
+            new Error(
+              "Automatic paste/copy is unavailable. Check Accessibility permissions or use the clipboard.",
+            ),
+          )
+        : resolve();
+    if (process.platform === "darwin")
+      execFile(
+        "osascript",
+        [
+          "-e",
+          `tell application "System Events" to keystroke "${key}" using command down`,
+        ],
+        { timeout: 5000 },
+        done,
+      );
+    else if (process.platform === "win32")
+      execFile(
+        "powershell",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `$w = New-Object -ComObject wscript.shell; $w.SendKeys('^${key}')`,
+        ],
+        { timeout: 5000 },
+        done,
+      );
+    else done(new Error("Unsupported platform"));
+  });
+}
+function clipboardSnapshot() {
+  return {
+    text: clipboard.readText(),
+    html: clipboard.readHTML(),
+    rtf: clipboard.readRTF(),
+    image: clipboard.readImage(),
+  };
+}
+async function selectedText() {
+  const previous = clipboardSnapshot();
+  const marker = "mockingbird-selection-" + randomUUID();
+  clipboard.writeText(marker);
+  try {
+    await keypress("c");
+    await pause(250);
+    const text = clipboard.readText();
+    return text === marker ? "" : text;
+  } finally {
+    clipboard.write(previous);
+  }
+}
+async function begin(mode) {
+  if (active) {
+    if (active.phase === "recording" && active.mode === mode) send("mb:stop");
+    return;
+  }
+  if (!readAuth()) {
+    openSettings();
+    return;
+  }
+  clearTimeout(hideTimer);
+  const current = {
+    id: randomUUID(),
+    mode,
+    phase: "starting",
+    controller: new AbortController(),
+    selection: "",
+  };
+  active = current;
+  try {
+    if (mode === "rewrite") {
+      current.selection = await selectedText();
+      if (!current.selection.trim())
+        throw new Error("Select the text you want to rewrite first.");
+      if (current.selection.length > 20000)
+        throw new Error("Select a shorter passage to rewrite.");
+    }
+    if (active !== current) return;
+    current.phase = "recording";
+    globalShortcut.register("Escape", cancelActive);
+    positionOverlay();
+    overlay.showInactive();
+    const cfg = loadConfig();
+    send("mb:listen", {
+      sessionId: current.id,
+      mode,
+      hotkey: pretty(
+        mode === "rewrite" ? cfg.rewriteHotkey : cfg.dictationHotkey,
+      ),
+      autoStopSeconds: cfg.autoStopSeconds,
+    });
+  } catch (err) {
+    active = null;
+    notify("Mockingbird", err.message);
+  }
+}
+function cancelActive() {
+  if (!active) return;
+  active.controller.abort();
+  send("mb:cancel", { silent: true });
+  active = null;
+  globalShortcut.unregister("Escape");
+  restoreFocus();
+  overlay?.hide();
+}
+async function deliverText(text, current, raw) {
+  if (active !== current) return;
+  const cfg = loadConfig();
+  clipboard.writeText(text);
+  pushHistory({ kind: current.mode, text, transcript: raw });
+  restoreFocus();
+  await pause(180);
+  let pasted = false;
+  if (cfg.autoPaste) {
+    try {
+      await keypress("v");
+      pasted = true;
+    } catch {
+      notify(
+        "Your words are copied",
+        "Automatic paste was unavailable. Press Cmd/Ctrl+V to paste.",
+      );
+    }
+  }
+  if (active !== current) return;
+  status("done", pasted ? "Paste sent" : "Copied to clipboard", text);
+  active = null;
+  globalShortcut.unregister("Escape");
+  hideSoon();
+}
+async function handleAudio(payload) {
+  const current = active;
+  if (
+    !current ||
+    current.id !== payload.sessionId ||
+    current.phase !== "recording"
+  )
+    return;
+  current.phase = "working";
+  globalShortcut.unregister("Escape");
+  const audio = Buffer.from(payload.buffer || []);
+  if (audio.length > 4 * 1024 * 1024 || audio.length < 100) {
+    status("error", "Recording was empty or too large");
+    active = null;
+    hideSoon(3500);
+    return;
+  }
+  lastRecording = { audio, mode: current.mode, selection: current.selection };
+  settingsWindow?.webContents.send("mb:history-changed");
+  await processAudio(current, audio);
+}
+async function processAudio(current, audio) {
+  try {
+    status("working", "Transcribing…");
+    const result = await api("/api/transcribe", {
+      body: audio,
+      raw: true,
+      signal: current.controller.signal,
+    });
+    if (active !== current) return;
+    const raw = (result.text || "").trim();
+    if (!raw) throw new Error("No words heard. Please try again.");
+    if (current.mode === "rewrite") {
+      status("working", "Rewriting…");
+      const revised = await api("/api/rewrite", {
+        body: { text: current.selection, instruction: raw },
+        signal: current.controller.signal,
+      });
+      if (active !== current) return;
+      current.phase = "review";
+      current.revised = revised.text;
+      current.instruction = raw;
+      send("mb:confirm", { original: current.selection, text: revised.text });
+      overlay.show();
+      overlay.focus();
+      return;
+    }
+    if (result.snippet) return await deliverText(result.snippet, current, raw);
+    let text = raw;
+    status("working", "Polishing…", raw);
+    try {
+      const cfg = loadConfig();
+      text =
+        (
+          await api("/api/format", {
+            body: {
+              text: raw,
+              tone: cfg.tone,
+              dictionary: cfg.dictionary,
+              learn: cfg.learn,
+            },
+            signal: current.controller.signal,
+          })
+        ).text || raw;
+    } catch {
+      if (active === current)
+        notify(
+          "Raw transcript preserved",
+          "Cleanup was unavailable. Your unpolished words are ready.",
+        );
+    }
+    await deliverText(text, current, raw);
+  } catch (err) {
+    if (active !== current) return;
+    active = null;
+    status(
+      "error",
+      err.message,
+      "Retry this recording in Settings, or record again.",
+    );
+    notify("Mockingbird", err.message);
+    hideSoon(5000);
+  }
+}
+function trusted(event, window) {
+  return Boolean(
+    window &&
+      !window.isDestroyed() &&
+      event.sender === window.webContents &&
+      event.senderFrame === window.webContents.mainFrame,
   );
 }
-
-function send(channel, payload) {
-  if (overlay && !overlay.isDestroyed()) overlay.webContents.send(channel, payload);
-}
-
-function status(state, message, detail) {
-  send('mb:status', { state, message, detail });
-}
-
-function hideOverlaySoon(ms) {
-  setTimeout(() => {
-    if (overlay && !listening && !pendingConfirm) overlay.hide();
-  }, ms);
-}
-
-// ------------------------------------------------------------- dictation
-
-// Escape cancels a dictation from wherever the user is typing. It is only
-// grabbed while the overlay is actually listening, and released the moment it
-// stops, so it never interferes with anything else.
-function grabEscape(on) {
-  try {
-    if (on) globalShortcut.register('Escape', () => { if (listening) send('mb:cancel'); });
-    else globalShortcut.unregister('Escape');
-  } catch (e) { /* some desktops refuse to share Escape — not worth failing over */ }
-}
-
-function beginListening(mode) {
-  const cfg = loadConfig();
-  if (!setupComplete(cfg)) { openSettings('setup'); return; }
-  currentMode = mode;
-  listening = true;
-  pendingConfirm = null;
-  grabEscape(true);
-  positionOverlay();
-  overlay.showInactive();   // never steal focus from the app being dictated into
-  send('mb:listen', {
-    mode,
-    hotkey: prettyHotkey(mode === 'command' ? cfg.commandHotkey : cfg.dictationHotkey),
-    autoStopSeconds: cfg.autoStopSeconds
+function settingHandler(name, fn) {
+  ipcMain.handle(name, async (event, ...args) => {
+    if (!trusted(event, settingsWindow)) throw new Error("Not allowed");
+    return fn(...args);
   });
 }
-
-function toggle(mode) {
-  if (pendingConfirm) return;              // the hotkey shouldn't fight the confirm card
-  if (listening && mode === currentMode) send('mb:stop');
-  else if (listening) {
-    // Switching modes mid-listen: tear the recording down without the overlay
-    // reporting back, or its acknowledgement would arrive after the new
-    // session had already started and hide the window again.
-    send('mb:cancel', { silent: true });
-    listening = false;
-    beginListening(mode);
-  } else beginListening(mode);
-}
-
-/** Audio has arrived from the overlay: transcribe, decide, act. */
-async function handleAudio(buffer, mode) {
-  const cfg = loadConfig();
-  listening = false;
-  grabEscape(false);
-  try {
-    status('working', 'Transcribing…');
-    const transcription = await api('/api/transcribe', {
-      body: Buffer.from(buffer),
-      headers: {
-        'Content-Type': 'audio/webm',
-        'X-Mockingbird-Lang': cfg.lang || 'en-US',
-        'X-Mockingbird-User': cfg.userId || ''
-      }
-    });
-    const raw = (transcription.text || '').trim();
-    if (!raw) { status('error', 'Heard nothing'); hideOverlaySoon(1800); return; }
-
-    const connectors = enabledConnectors(cfg);
-    const wantsActions = connectors.length && (mode === 'command' || cfg.smartCommands);
-
-    if (wantsActions) {
-      status('working', mode === 'command' ? 'Working out what to do…' : 'Polishing…', raw);
-      let decision;
-      try {
-        decision = await api('/api/actions', {
-          body: {
-            text: raw,
-            mode: mode === 'command' ? 'command' : 'auto',
-            connectors,
-            appContext: 'desktop — the speaker is working in another application',
-            dictionary: cfg.dictionary || [],
-            user: cfg.userId || null,
-            learn: cfg.learn !== false
-          }
-        });
-      } catch (err) {
-        // Action routing unavailable — never lose the words.
-        return finishDictation(raw, cfg);
-      }
-      if (decision && decision.kind === 'actions' && decision.actions && decision.actions.length) {
-        return proposeActions(decision.actions, raw, cfg);
-      }
-      const cleaned = (decision && decision.text) || raw;
-      return deliverText(cleaned, raw, cfg, 'dictation');
-    }
-
-    return finishDictation(raw, cfg);
-  } catch (err) {
-    console.error('mockingbird:', err.message);
-    status('error', err.message);
-    notify('Mockingbird', err.message);
-    hideOverlaySoon(3500);
-  }
-}
-
-async function finishDictation(raw, cfg) {
-  try {
-    status('working', 'Polishing…', raw);
-    const formatted = await api('/api/format', {
-      body: {
-        text: raw,
-        tone: cfg.tone || 'clean',
-        appContext: 'desktop dictation into another application',
-        dictionary: cfg.dictionary || [],
-        user: cfg.userId || null,
-        learn: cfg.learn !== false
-      }
-    });
-    return deliverText((formatted.text || raw).trim(), raw, cfg, 'dictation');
-  } catch (err) {
-    // Formatter down → the raw transcript still goes in. Words are never lost.
-    return deliverText(raw, raw, cfg, 'dictation (raw)');
-  }
-}
-
-function deliverText(text, raw, cfg, kind) {
-  if (!text) { status('error', 'Nothing to insert'); hideOverlaySoon(1800); return; }
-  clipboard.writeText(text);
-  if (cfg.autoPaste !== false) pasteIntoFrontApp();
-  status('done', 'Inserted', text);
-  pushHistory({ kind, transcript: raw, text });
-  hideOverlaySoon(1200);
-}
-
-// --------------------------------------------------------------- actions
-
-function describeAction(action) {
-  const label = action.name.replace(/^fub_/, '').replace(/_/g, ' ');
-  const fields = Object.entries(action.input || {})
-    .filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && !v.length))
-    .map(([k, v]) => ({ key: k, value: Array.isArray(v) ? v.join(', ') : String(v) }));
-  return { name: action.name, label, connector: action.connectorLabel || action.connector, fields };
-}
-
-function proposeActions(actions, transcript, cfg) {
-  // App-owned actions can't run from the desktop (there is no app here to
-  // handle them); connector actions can.
-  const runnable = actions.filter((a) => a.execute);
-  // Nothing here the desktop can run (an app-owned action with no app in
-  // front of it) — treat what they said as dictation rather than dropping it.
-  if (!runnable.length) return finishDictation(transcript, cfg);
-
-  if (cfg.confirmActions === false) return runActions(runnable, transcript, cfg);
-
-  pendingConfirm = { actions: runnable, transcript };
-  send('mb:confirm', { actions: runnable.map(describeAction), transcript });
-  // The confirm card is the one moment we take focus — the user is deciding,
-  // not typing. Focus returns to their app as soon as it resolves.
-  overlay.show();
-  overlay.focus();
-}
-
-async function runActions(actions, transcript, cfg) {
-  pendingConfirm = null;
-  status('working', actions.length > 1 ? `Doing ${actions.length} things…` : 'Doing it…');
-  try {
-    const response = await api('/api/act', {
-      body: {
-        actions: actions.map((a) => ({ name: a.name, input: a.input })),
-        connectors: enabledConnectors(cfg),
-        user: cfg.userId || null,
-        appContext: 'desktop command',
-        transcript
-      }
-    });
-    const results = (response && response.results) || [];
-    const ok = results.filter((r) => r.ok);
-    const failed = results.filter((r) => !r.ok);
-    const summary = (ok.length ? ok : results).map((r) => r.summary || r.error).filter(Boolean).join(' · ');
-
-    // A lookup ("what's Maria's number") answers by pasting the answer.
-    const answer = ok.map((r) => r.text).filter(Boolean).join('\n');
-    if (answer) {
-      clipboard.writeText(answer);
-      if (cfg.autoPaste !== false) pasteIntoFrontApp();
-    }
-
-    pushHistory({
-      kind: 'command',
-      transcript,
-      text: summary,
-      actions: actions.map((a) => ({ name: a.name, input: a.input })),
-      ok: failed.length === 0
-    });
-
-    if (failed.length && !ok.length) {
-      status('error', failed[0].error || 'That did not go through');
-      notify('Mockingbird', failed[0].error || 'Action failed');
-      hideOverlaySoon(4000);
-    } else {
-      status('done', summary || 'Done');
-      hideOverlaySoon(failed.length ? 4000 : 2200);
-    }
-  } catch (err) {
-    console.error('mockingbird act:', err.message);
-    status('error', err.message);
-    pushHistory({ kind: 'command', transcript, text: err.message, ok: false });
-    hideOverlaySoon(4000);
-  } finally {
-    restoreFocus();
-  }
-}
-
-/** Give focus back to whatever the user was working in. */
-function restoreFocus() {
-  if (process.platform === 'darwin' && typeof app.hide === 'function') {
-    try { app.hide(); } catch (e) { /* no-op when nothing was focused */ }
-  } else if (overlay && !overlay.isDestroyed()) {
-    overlay.blur();
-  }
-}
-
-// ----------------------------------------------------------------- paste
-
-// Remembered the moment recording starts, restored after the paste lands, so
-// dictating never silently eats what the user had copied.
-let savedClipboard = null;
-
-/**
- * Paste into whatever app has focus. The text is already on the clipboard;
- * we simulate the platform paste keystroke — no native modules to build or
- * sign. Whatever the user had on the clipboard is put back afterwards.
- */
-function pasteIntoFrontApp() {
-  const restoreClipboard = savedClipboard;
-  const done = (err) => {
-    if (err) {
-      notify('Copied to clipboard',
-        process.platform === 'darwin'
-          ? 'Press Cmd+V to insert. For automatic pasting, allow Mockingbird under System Settings → Privacy & Security → Accessibility.'
-          : 'Press Ctrl+V to insert.');
-    }
-    if (restoreClipboard != null) {
-      // Put their clipboard back once the paste has landed.
-      setTimeout(() => { try { clipboard.writeText(restoreClipboard); } catch (e) {} }, 1500);
-    }
-  };
-  if (process.platform === 'darwin') {
-    execFile('osascript', ['-e',
-      'tell application "System Events" to keystroke "v" using command down'], done);
-  } else if (process.platform === 'win32') {
-    execFile('powershell', ['-NoProfile', '-Command',
-      "$w = New-Object -ComObject wscript.shell; $w.SendKeys('^v')"], done);
-  } else {
-    execFile('xdotool', ['key', '--clearmodifiers', 'ctrl+v'], done);
-  }
-}
-
-function rememberClipboard() {
-  try { savedClipboard = clipboard.readText(); } catch (e) { savedClipboard = null; }
-}
-
-function notify(title, body) {
-  try { new Notification({ title, body }).show(); } catch (e) { /* headless */ }
-}
-
-// ------------------------------------------------------------------- ipc
-
-ipcMain.on('mb:audio', (event, payload) => {
-  handleAudio(payload.buffer, payload.mode || currentMode);
+ipcMain.on("mb:audio", (e, p) => {
+  if (trusted(e, overlay)) handleAudio(p);
 });
-
-ipcMain.on('mb:cancelled', () => {
-  listening = false;
-  grabEscape(false);
-  pendingConfirm = null;
-  if (overlay) overlay.hide();
+ipcMain.on("mb:recording-error", (event, payload) => {
+  if (!trusted(event, overlay) || payload.sessionId !== active?.id) return;
+  active.controller.abort();
+  active = null;
+  globalShortcut.unregister("Escape");
+  notify(
+    "Microphone unavailable",
+    "Allow microphone access for Mockingbird in your system privacy settings.",
+  );
+  hideSoon(4500);
 });
-
-ipcMain.on('mb:confirm-response', (event, payload) => {
-  const cfg = loadConfig();
-  const pending = pendingConfirm;
-  if (!pending) return;
-  if (payload && payload.accept) {
-    runActions(pending.actions, pending.transcript, cfg);
-  } else {
-    pendingConfirm = null;
-    status('idle', 'Cancelled');
-    pushHistory({ kind: 'command (cancelled)', transcript: pending.transcript, text: '', ok: false });
-    restoreFocus();
-    hideOverlaySoon(400);
+ipcMain.on("mb:cancelled", (e, p) => {
+  if (trusted(e, overlay) && (!p?.sessionId || p.sessionId === active?.id))
+    cancelActive();
+});
+ipcMain.on("mb:confirm-response", async (e, p) => {
+  if (!trusted(e, overlay) || active?.phase !== "review") return;
+  const current = active;
+  if (!p?.accept) {
+    cancelActive();
+    return;
   }
+  current.phase = "working";
+  // Always copy the reviewed text. Restore focus before attempting replacement.
+  await deliverText(current.revised, current, current.instruction);
 });
-
-ipcMain.on('mb:recording-started', () => { rememberClipboard(); });
-
-ipcMain.handle('mb:get-config', () => loadConfig());
-ipcMain.handle('mb:save-config', (event, patch) => saveConfig(patch));
-ipcMain.handle('mb:get-history', () => loadHistory());
-ipcMain.handle('mb:clear-history', () => {
-  try { fs.writeFileSync(historyPath(), '[]'); } catch (e) {}
+settingHandler("mb:get-config", publicConfig);
+settingHandler("mb:save-config", saveConfig);
+settingHandler("mb:get-history", loadHistory);
+settingHandler("mb:clear-history", () => {
+  fs.writeFileSync(historyPath(), "[]", { mode: 0o600 });
   return [];
 });
-ipcMain.handle('mb:open-config-file', () => shell.openPath(configPath()));
-ipcMain.handle('mb:quit', () => app.quit());
-ipcMain.handle('mb:dictate-now', () => { toggle('dictation'); });
-
-/** Settings uses these to reach the deployment without holding any secrets. */
-ipcMain.handle('mb:check-deployment', async (event, baseUrl) => {
-  const url = String(baseUrl || '').replace(/\/$/, '');
-  if (!/^https?:\/\//.test(url)) return { ok: false, error: 'Enter a full https:// URL' };
-  try {
-    const r = await fetch(url + '/api/tools', { method: 'GET' });
-    if (!r.ok) return { ok: false, error: `Deployment answered ${r.status}` };
-    const data = await r.json();
-    return { ok: true, ...data };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
+settingHandler("mb:copy-history", (index) => {
+  const item = loadHistory()[Number(index)];
+  if (item?.text) clipboard.writeText(item.text);
 });
-
-ipcMain.handle('mb:list-commands', async () => {
+settingHandler("mb:connect", async (value) => {
+  const parsed = new URL(String(value).trim());
+  const code = parsed.hash.slice(1);
+  parsed.hash = "";
+  const base = trustedURL(parsed.href);
+  if (!/^[a-f0-9]{32}$/i.test(code))
+    throw new Error(
+      "Paste the full connection code from My devices in your account.",
+    );
+  const data = await api("/api/device", {
+    baseUrl: base,
+    token: null,
+    body: {
+      action: "exchange",
+      code,
+      name: process.platform === "darwin" ? "Mac" : "Windows PC",
+    },
+  });
+  writeAuth({ token: data.token, expiresAt: data.expiresAt });
   const cfg = loadConfig();
-  const connectors = enabledConnectors(cfg);
-  if (!connectors.length || !setupComplete(cfg)) return { tools: [] };
-  try { return await api('/api/tools', { body: { connectors } }); }
-  catch (err) { return { tools: [], error: err.message }; }
+  cfg.baseUrl = base;
+  fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2), { mode: 0o600 });
+  applyConfig(cfg);
+  return publicConfig();
 });
-
-ipcMain.handle('mb:profile', async (event, action) => {
-  const cfg = loadConfig();
-  if (!cfg.userId) return { enabled: false, error: 'Set your name in Settings first.' };
-  const query = `?user=${encodeURIComponent(cfg.userId)}`;
+settingHandler("mb:disconnect", () => {
+  cancelActive();
+  lastRecording = null;
   try {
-    if (action === 'refresh') return await api('/api/profile', { body: { user: cfg.userId, refresh: true } });
-    if (action === 'forget') return await api('/api/profile' + query, { method: 'DELETE' });
-    return await api('/api/profile' + query, { method: 'GET' });
-  } catch (err) {
-    return { enabled: false, error: err.message };
-  }
+    fs.unlinkSync(authPath());
+  } catch {}
+  return publicConfig();
 });
-
-// -------------------------------------------------------------- settings
-
-function openSettings(tab) {
+settingHandler("mb:open-account", () => {
+  const base = loadConfig().baseUrl;
+  if (!base)
+    throw new Error(
+      "Open the website you received from Thunderbird to create your account.",
+    );
+  return shell.openExternal(trustedURL(base) + "/account");
+});
+settingHandler("mb:retry", async () => {
+  if (active || !lastRecording)
+    throw new Error("No recording is available to retry.");
+  const r = lastRecording;
+  const current = {
+    id: randomUUID(),
+    mode: r.mode,
+    selection: r.selection,
+    phase: "working",
+    controller: new AbortController(),
+  };
+  active = current;
+  positionOverlay();
+  overlay.showInactive();
+  await processAudio(current, r.audio);
+});
+settingHandler("mb:forget-recording", () => {
+  lastRecording = null;
+  return publicConfig();
+});
+settingHandler("mb:check-updates", async () => {
+  if (!app.isPackaged)
+    throw new Error("Updates are available in installed releases.");
+  await autoUpdater.checkForUpdates();
+  return "Update check complete. You will be notified when an update is ready.";
+});
+settingHandler("mb:install-update", () => {
+  if (updateReady) autoUpdater.quitAndInstall();
+});
+settingHandler("mb:microphone", async () => {
+  if (process.platform === "darwin")
+    return systemPreferences.askForMediaAccess("microphone");
+  return true;
+});
+settingHandler("mb:quit", () => app.quit());
+function openSettings() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show();
     settingsWindow.focus();
-    if (tab) settingsWindow.webContents.send('mb:open-tab', tab);
     return;
   }
   settingsWindow = new BrowserWindow({
-    width: 860,
-    height: 700,
-    minWidth: 720,
+    width: 900,
+    height: 740,
+    minWidth: 700,
     minHeight: 560,
-    title: 'Mockingbird',
+    title: "Mockingbird",
     show: false,
-    backgroundColor: '#0d1117',
+    backgroundColor: "#f5f4ee",
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "settings-preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
+  lockWindow(settingsWindow);
   settingsWindow.setMenuBarVisibility(false);
-  settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
-  settingsWindow.once('ready-to-show', () => {
-    showDock();
-    settingsWindow.show();
-    if (tab) settingsWindow.webContents.send('mb:open-tab', tab);
-  });
-  settingsWindow.on('closed', () => {
+  settingsWindow.loadFile(path.join(__dirname, "settings.html"));
+  settingsWindow.once("ready-to-show", () => settingsWindow.show());
+  settingsWindow.on("closed", () => {
     settingsWindow = null;
-    hideDock();
-  });
-  // Links in the settings window open in the real browser.
-  settingsWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
   });
 }
-
-// ------------------------------------------------------------------ tray
-
-// The dock only exists on macOS, and Electron has reshaped `app.dock` across
-// major versions — feature-detect instead of assuming it is callable.
-function hideDock() {
-  if (process.platform !== 'darwin') return;
-  if (app.dock && typeof app.dock.hide === 'function') app.dock.hide();
-}
-
-function showDock() {
-  if (process.platform !== 'darwin') return;
-  if (app.dock && typeof app.dock.show === 'function') app.dock.show();
-}
-
-function trayImage() {
-  const file = process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png';
-  const image = nativeImage.createFromPath(path.join(__dirname, 'assets', file));
-  if (process.platform === 'darwin') image.setTemplateImage(true);
-  return image;
-}
-
-function prettyHotkey(hotkey) {
-  return String(hotkey || '').replace('CommandOrControl', process.platform === 'darwin' ? 'Cmd' : 'Ctrl');
-}
-
-function buildTrayMenu() {
-  const cfg = loadConfig();
-  const connectors = enabledConnectors(cfg);
+const pretty = (value) =>
+  String(value || "").replace(
+    "CommandOrControl",
+    process.platform === "darwin" ? "Cmd" : "Ctrl",
+  );
+function menu() {
+  const c = loadConfig();
   return Menu.buildFromTemplate([
-    { label: `Dictate  (${prettyHotkey(cfg.dictationHotkey)})`, click: () => toggle('dictation') },
     {
-      label: `Command  (${prettyHotkey(cfg.commandHotkey)})`,
-      enabled: connectors.length > 0,
-      click: () => toggle('command')
+      label: `Dictate (${pretty(c.dictationHotkey)})`,
+      click: () => begin("dictation"),
     },
-    { type: 'separator' },
     {
-      label: connectors.length
-        ? `Connected: ${connectors.map((c) => c.label || c.type).join(', ')}`
-        : 'No connectors yet',
-      enabled: false
+      label: `Rewrite selection (${pretty(c.rewriteHotkey)})`,
+      click: () => begin("rewrite"),
     },
-    { label: 'Settings…', click: () => openSettings() },
-    { label: 'History…', click: () => openSettings('history') },
-    { type: 'separator' },
-    { label: 'Quit Mockingbird', click: () => app.quit() }
+    { type: "separator" },
+    { label: "Settings & history", click: openSettings },
+    { label: "Quit Mockingbird", click: () => app.quit() },
   ]);
 }
-
-function createTray() {
-  try {
-    tray = new Tray(trayImage());
-    const cfg = loadConfig();
-    tray.setToolTip(`Mockingbird — ${prettyHotkey(cfg.dictationHotkey)} to dictate`);
-    tray.setContextMenu(buildTrayMenu());
-    // Clicking the icon starts dictation; the menu is on right-click.
-    tray.on('click', () => toggle('dictation'));
-  } catch (err) {
-    console.error('mockingbird: tray unavailable', err.message);
-  }
-}
-
-// --------------------------------------------------------------- hotkeys
-
-function registerHotkeys(cfg) {
-  globalShortcut.unregisterAll();
-  const failures = [];
-  if (cfg.dictationHotkey && !globalShortcut.register(cfg.dictationHotkey, () => toggle('dictation'))) {
-    failures.push(prettyHotkey(cfg.dictationHotkey));
-  }
-  if (cfg.commandHotkey && !globalShortcut.register(cfg.commandHotkey, () => toggle('command'))) {
-    failures.push(prettyHotkey(cfg.commandHotkey));
-  }
-  if (failures.length) {
-    notify('Mockingbird', `${failures.join(' and ')} ${failures.length > 1 ? 'are' : 'is'} already taken by another app — pick a different shortcut in Settings.`);
-  }
-}
-
 function applyConfig(cfg) {
-  registerHotkeys(cfg);
-  if (tray && !tray.isDestroyed()) {
-    tray.setContextMenu(buildTrayMenu());
-    tray.setToolTip(`Mockingbird — ${prettyHotkey(cfg.dictationHotkey)} to dictate`);
+  globalShortcut.unregisterAll();
+  for (const [hotkey, mode] of [
+    [cfg.dictationHotkey, "dictation"],
+    [cfg.rewriteHotkey, "rewrite"],
+  ]) {
+    try {
+      if (!globalShortcut.register(hotkey, () => begin(mode)))
+        notify(
+          "Shortcut unavailable",
+          "Choose a different shortcut in Settings.",
+        );
+    } catch {
+      notify("Invalid shortcut", "Choose a valid shortcut in Settings.");
+    }
   }
-  try {
-    app.setLoginItemSettings({ openAtLogin: cfg.launchAtLogin !== false, openAsHidden: true });
-  } catch (e) { /* unsupported platform */ }
+  tray?.setContextMenu(menu());
+  app.setLoginItemSettings({ openAtLogin: cfg.launchAtLogin });
 }
-
-// ------------------------------------------------------------------- app
-
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-} else {
-  app.on('second-instance', () => openSettings());
-
+if (!app.requestSingleInstanceLock()) app.quit();
+else {
   app.whenReady().then(() => {
+    fs.mkdirSync(app.getPath("userData"), { recursive: true });
+    // Remove legacy shared credentials from config instead of exposing them to renderers.
     const cfg = loadConfig();
-    // Our own windows are the only thing running here; the microphone is the
-    // whole point of the app, so grant it and deny everything else.
-    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-      callback(permission === 'media');
+    fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2), {
+      mode: 0o600,
     });
-    // Tray app: no dock icon until a window is open.
-    if (process.platform === 'darwin' && app.dock) app.dock.hide();
+    session.defaultSession.setPermissionRequestHandler(
+      (contents, permission, callback, details) =>
+        callback(
+          contents === overlay?.webContents &&
+            permission === "media" &&
+            (!details.mediaTypes ||
+              details.mediaTypes.every((x) => x === "audio")),
+        ),
+    );
+    session.defaultSession.setPermissionCheckHandler(
+      (contents, permission) =>
+        contents === overlay?.webContents && permission === "media",
+    );
     createOverlay();
-    createTray();
+    const icon = nativeImage.createFromPath(
+      path.join(
+        __dirname,
+        "assets",
+        process.platform === "darwin" ? "trayTemplate.png" : "tray.png",
+      ),
+    );
+    if (process.platform === "darwin") icon.setTemplateImage(true);
+    tray = new Tray(icon);
+    tray.setToolTip("Mockingbird");
+    tray.setContextMenu(menu());
+    tray.on("click", () => begin("dictation"));
     applyConfig(cfg);
-
-    if (!setupComplete(cfg)) openSettings('setup');
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on("error", () =>
+      notify("Update unavailable", "Try again later from Settings."),
+    );
+    autoUpdater.on("update-downloaded", () => {
+      updateReady = true;
+      notify("Mockingbird update ready", "Restart the app to finish updating.");
+      settingsWindow?.webContents.send("mb:history-changed");
+    });
+    if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
+    if (!readAuth()) openSettings();
   });
-
-  app.on('activate', () => openSettings());
-  app.on('window-all-closed', () => { /* tray app — stay alive */ });
-  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on("second-instance", openSettings);
+  app.on("activate", openSettings);
+  app.on("window-all-closed", () => {});
+  app.on("will-quit", () => {
+    globalShortcut.unregisterAll();
+    lastRecording = null;
+    active?.controller.abort();
+  });
 }
-
-// Surface anything unexpected instead of dying silently in the tray.
-process.on('unhandledRejection', (err) => {
-  console.error('mockingbird: unhandled rejection', err);
-});

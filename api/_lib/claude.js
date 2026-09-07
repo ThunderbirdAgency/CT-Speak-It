@@ -14,14 +14,14 @@
  *             expensive.
  *   BACKGROUND the profile distiller — runs after the response has been sent.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic from "@anthropic-ai/sdk";
 
-export const MODEL = 'claude-opus-5';
+export const MODEL = process.env.MOCKINGBIRD_MODEL || "claude-sonnet-4-6";
 
 export const EFFORT = {
-  FAST: 'low',
-  THOROUGH: 'high',
-  BACKGROUND: 'medium'
+  FAST: "low",
+  THOROUGH: "high",
+  BACKGROUND: "medium",
 };
 
 /**
@@ -31,7 +31,7 @@ export const EFFORT = {
  */
 export const SETUP_MESSAGE =
   "This deployment's ANTHROPIC_API_KEY is missing or was rejected by Claude. " +
-  'Check it in the Vercel project settings, then redeploy.';
+  "Check it in the Vercel project settings, then redeploy.";
 
 let client = null;
 
@@ -43,7 +43,7 @@ let client = null;
  */
 export function claude() {
   if (!process.env.ANTHROPIC_API_KEY) {
-    const err = new Error('ANTHROPIC_API_KEY is not set on this deployment.');
+    const err = new Error("ANTHROPIC_API_KEY is not set on this deployment.");
     err.setup = true;
     throw err;
   }
@@ -53,5 +53,7 @@ export function claude() {
 
 /** True when the failure is a missing/blocked credential rather than a blip. */
 export function isSetupError(err) {
-  return Boolean(err && (err.setup || err.status === 401 || err.status === 403));
+  return Boolean(
+    err && (err.setup || err.status === 401 || err.status === 403),
+  );
 }

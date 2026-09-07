@@ -1,8 +1,8 @@
 {
   "name": "mockingbird-desktop",
   "productName": "Mockingbird",
-  "version": "1.0.0",
-  "description": "Mockingbird \u2014 talk instead of type, anywhere on your machine, and tell your CRM what to do.",
+  "version": "1.1.0",
+  "description": "Mockingbird by Thunderbird \u2014 voice dictation, reviewed rewrites and saved responses.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -25,13 +25,23 @@
       "preload.js",
       "overlay.html",
       "settings.html",
-      "assets/**/*"
+      "assets/**/*",
+      "settings-preload.js",
+      "settings.js",
+      "settings.css",
+      "overlay.js"
     ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "universal"
           ]
@@ -46,7 +56,8 @@
         "NSAppleEventsUsageDescription": "Mockingbird sends a paste keystroke so dictated text lands where your cursor is.",
         "LSUIElement": true
       },
-      "artifactName": "Mockingbird-mac.${ext}"
+      "artifactName": "Mockingbird-mac.${ext}",
+      "notarize": true
     },
     "win": {
       "target": "nsis",
@@ -63,6 +74,17 @@
       "target": "AppImage",
       "icon": "assets/icon.png",
       "category": "Utility"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ThunderbirdAgency",
+        "repo": "CT-Speak-It"
+      }
+    ],
+    "forceCodeSigning": true
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   }
 }

@@ -1,11 +1,11 @@
-# Every push runs the whole suite: connector request shapes, the API as Vercel
-# invokes it, the desktop main process headlessly, and the widget in Chromium.
-# Nothing here touches the network or needs a secret.
+# Every push checks consumer API security, gift/billing behavior, PostgreSQL,
+# desktop behavior with a simulated OS, static pages, and legacy connector shapes.
+# Browser/real-OS release checks are separate; no live credentials are needed.
 name: Tests
 
 on:
   push:
-    branches: ['**']
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
@@ -17,14 +17,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
 
       - name: Install
         run: npm ci
-
-      - name: Install Chromium for the widget tests
-        run: npx playwright install --with-deps chromium
 
       - name: Run tests
         run: npm test

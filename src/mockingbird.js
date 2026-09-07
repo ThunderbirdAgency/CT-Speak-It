@@ -45,7 +45,7 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
 
-  var VERSION = '4.0.0';
+  var VERSION = '5.0.0';
   var DICT_STORAGE_KEY = 'mockingbird.dictionary';
   var LEGACY_DICT_KEY = 'speakit.dictionary';
 
@@ -61,10 +61,8 @@
     formatEndpoint: null,
     // Server transcription endpoint: POST audio/webm body -> {text}.
     transcribeEndpoint: null,
-    // Access key, if the deployment requires one (MOCKINGBIRD_ACCESS_KEY).
-    // In a browser this is readable by anyone with the page — it keeps out
-    // passers-by who learn the URL, it is not a secret. See docs/INSTALL.md.
-    accessKey: null,
+    // Async callback returning the signed-in user's short-lived Clerk session token.
+    getToken: null,
     // Voice-actions endpoint: POST {text, actions, connectors, appContext, dictionary, user}
     //   -> {kind:'actions', actions:[{name, input, connector, execute}, ...]} | {kind:'dictation', text}.
     actionsEndpoint: null,
@@ -87,11 +85,10 @@
     tone: 'clean',
     // Extra context sent to Claude (e.g. "real-estate CRM, open-house scheduling").
     appContext: '',
-    // Who is speaking — flows through to the event log (Supabase) for analytics.
+    // Legacy display identifier only. Server identity comes from the verified token.
     userId: null,
-    // Let the deployment build a voice profile from these dictations
-    // (see docs/LEARNING.md). false = handle each utterance and forget it.
-    learn: true,
+    // Use the account’s explicitly approved memory, if also enabled there.
+    learn: false,
     // Personal dictionary: names, neighborhoods, jargon the recognizer gets wrong.
     // Merged with words learned via Mockingbird.learn(), persisted in localStorage.
     dictionary: [],
@@ -259,8 +256,16 @@
     // Headers for every call to the deployment.
     _headers: function (contentType) {
       var headers = { 'Content-Type': contentType || 'application/json' };
-      if (this.opts.accessKey) headers['X-Mockingbird-Key'] = this.opts.accessKey;
       return headers;
+    },
+
+    _fetch: async function (url, init) {
+      if (typeof this.opts.getToken !== 'function') throw new Error('Sign in to use cloud dictation.');
+      var token = await this.opts.getToken();
+      if (!token) throw new Error('Your sign-in expired.');
+      init.headers = Object.assign({}, init.headers, { Authorization: 'Bearer ' + token });
+      init.signal = AbortSignal.timeout(45000);
+      return fetch(url, init);
     },
 
     _dictionary: function () {
@@ -545,7 +550,7 @@
           if (self._cancelled) return;
           var blob = new Blob(self.chunks, { type: mr.mimeType || 'audio/webm' });
           self._setState('polishing', 'Transcribing…');
-          fetch(self.opts.transcribeEndpoint, {
+          self._fetch(self.opts.transcribeEndpoint, {
             method: 'POST',
             headers: Object.assign(self._headers(blob.type || 'audio/webm'), {
               'X-Mockingbird-Lang': self.opts.lang,
@@ -554,7 +559,7 @@
             body: blob
           })
             .then(function (r) { if (!r.ok) throw new Error('Transcription failed (' + r.status + ')'); return r.json(); })
-            .then(function (data) { self._finish((data.text || '').trim()); })
+            .then(function (data) { if(data.snippet)self._insert(data.snippet);else self._finish((data.text || '').trim()); })
             .catch(function (err) { self._fail(err.message); });
         };
         self.mediaRecorder = mr;
@@ -569,9 +574,7 @@
     _finish: function (raw) {
       raw = (raw || '').trim();
       if (!raw) { this._setState('idle'); return; }
-      if (this.opts.actionsEndpoint && (this.opts.actions.length || this.opts.connectors.length)) {
-        this._resolveAction(raw);
-      } else if (this.opts.formatEndpoint) {
+      if (this.opts.formatEndpoint) {
         this._polish(raw);
       } else {
         this._insert(raw);
@@ -583,7 +586,7 @@
     _resolveAction: function (raw) {
       var self = this;
       this._setState('polishing', 'Understanding…');
-      fetch(this.opts.actionsEndpoint, {
+      this._fetch(this.opts.actionsEndpoint, {
         method: 'POST',
         headers: this._headers(),
         body: JSON.stringify({
@@ -680,7 +683,7 @@
     _runActions: function (actions, raw) {
       var self = this;
       this._setState('polishing', 'Doing it…');
-      fetch(this.opts.actEndpoint, {
+      this._fetch(this.opts.actEndpoint, {
         method: 'POST',
         headers: this._headers(),
         body: JSON.stringify({
@@ -716,7 +719,7 @@
         isEditable(el) && !el.isContentEditable;
       if (canLive) pending = this._insertField(el, raw);
       this._setState('polishing');
-      fetch(this.opts.formatEndpoint, {
+      this._fetch(this.opts.formatEndpoint, {
         method: 'POST',
         headers: this._headers(),
         body: JSON.stringify({
@@ -724,7 +727,7 @@
           tone: this.opts.tone,
           appContext: this.opts.appContext || document.title,
           dictionary: this._dictionary(),
-          user: this.opts.userId
+          learn: this.opts.learn === true
         })
       })
         .then(function (r) { if (!r.ok) throw new Error('format ' + r.status); return r.json(); })
@@ -926,7 +929,6 @@
         if (d.transcribeEndpoint) opts.transcribeEndpoint = d.transcribeEndpoint;
         if (d.actionsEndpoint) opts.actionsEndpoint = d.actionsEndpoint;
         if (d.actEndpoint) opts.actEndpoint = d.actEndpoint;
-        if (d.accessKey) opts.accessKey = d.accessKey;
         if (d.connectors) opts.connectors = d.connectors.split(',').map(function (c) { return c.trim(); }).filter(Boolean);
         if (d.confirmActions === 'false') opts.confirmActions = false;
         if (d.learn === 'false') opts.learn = false;
