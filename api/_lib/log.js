@@ -7,6 +7,29 @@ export function supabaseConfigured() {
 
 /** Thin PostgREST wrapper — the service key never leaves the server. */
 export async function sb(path, init = {}) {
+  try {
+    return await databaseRequest(path, init);
+  } catch (err) {
+    // Never log request URLs, headers, bodies, or provider error messages:
+    // they can contain credentials, user IDs, or personal content.
+    const status = /^supabase (\d{3}):/.exec(err.message || "");
+    const knownCodes = new Set([
+      "ERR_INVALID_URL", "ERR_INVALID_CHAR", "ENOTFOUND", "EAI_AGAIN",
+      "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT",
+    ]);
+    const code = err.cause?.code || err.code;
+    console.error("Mockingbird database request failed", {
+      stage: status ? "database_response" : "request_or_decode",
+      httpStatus: status ? Number(status[1]) : null,
+      code: knownCodes.has(code) ? code : null,
+      type: ["TypeError", "SyntaxError", "TimeoutError", "AbortError"].includes(err.name)
+        ? err.name : "Error",
+    });
+    throw err;
+  }
+}
+
+async function databaseRequest(path, init) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key)
